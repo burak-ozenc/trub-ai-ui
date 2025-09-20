@@ -114,6 +114,6 @@ const AudioRecorder = () => {
             )}
         </div>
     );
-};
+};  
 
 export default AudioRecorder;
