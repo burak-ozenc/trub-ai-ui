@@ -1,7 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { Mic, MicOff, Send, Upload, Music, MessageCircle, BarChart3, Loader2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
+import { api } from '../services/api';
+import { Mic, MicOff, Send, Upload, Music, MessageCircle, BarChart3, Loader2, User, Settings } from 'lucide-react';
 
 const TrumpetAnalyzer = () => {
+    const navigate = useNavigate();
+    const { user } = useAuth();
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
     const [error, setError] = useState('');
@@ -70,26 +75,11 @@ const TrumpetAnalyzer = () => {
             return;
         }
 
-        const formData = new FormData();
-        formData.append('audioData', audioBlob);
-        formData.append('guidance', guidance);
-        formData.append('analysis_type', 'full');
-
         setIsAnalyzing(true);
         setError('');
 
         try {
-            const response = await fetch('http://localhost:8000/analysis/comprehensive', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errorData = await response.json();
-                throw new Error(errorData.detail || 'Server error');
-            }
-
-            const data = await response.json();
+            const data = await api.analyzeAudio(audioBlob, guidance, 'full');
             setAnalysisResult(data);
 
         } catch (err) {
@@ -111,17 +101,7 @@ const TrumpetAnalyzer = () => {
         setChatQuestion('');
 
         try {
-            const formData = new FormData();
-            formData.append('question', currentQuestion);
-
-            const response = await fetch('http://localhost:8000/llm/ask-question', {
-                method: 'POST',
-                body: formData,
-            });
-
-            if (!response.ok) throw new Error('Failed to get response');
-
-            const data = await response.json();
+            const data = await api.askQuestion(currentQuestion);
             const botMessage = { type: 'bot', content: data.answer };
             setChatMessages(prev => [...prev, botMessage]);
 
@@ -145,11 +125,28 @@ const TrumpetAnalyzer = () => {
             <div className="max-w-6xl mx-auto">
                 {/* Header */}
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-                    <div className="flex items-center gap-3">
-                        <Music className="w-8 h-8 text-blue-600" />
-                        <h1 className="text-3xl font-bold text-gray-900">Trumpet Analyzer</h1>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <Music className="w-8 h-8 text-blue-600" />
+                            <div>
+                                <h1 className="text-3xl font-bold text-gray-900">Trumpet Analyzer</h1>
+                                <p className="text-gray-600 mt-1">AI-powered trumpet performance analysis and coaching</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="text-right mr-3">
+                                <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.username}</p>
+                                <p className="text-xs text-gray-500">{user?.email}</p>
+                            </div>
+                            <button
+                                onClick={() => navigate('/profile')}
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+                            >
+                                <Settings className="w-4 h-4" />
+                                Settings
+                            </button>
+                        </div>
                     </div>
-                    <p className="text-gray-600 mt-2">AI-powered trumpet performance analysis and coaching</p>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
