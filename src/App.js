@@ -1,6 +1,8 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { Provider } from 'react-redux';
 import { AuthProvider } from './context/AuthContext';
+import store from './store';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
@@ -9,36 +11,38 @@ import ProfileSettings from './components/Profile/ProfileSettings';
 
 function App() {
     return (
-        <AuthProvider>
-            <Router>
-                <Routes>
-                    {/* Public routes */}
-                    <Route path="/login" element={<Login />} />
-                    <Route path="/register" element={<Register />} />
+        <Provider store={store}>
+            <AuthProvider>
+                <Router>
+                    <Routes>
+                        {/* Public routes */}
+                        <Route path="/login" element={<Login />} />
+                        <Route path="/register" element={<Register />} />
 
-                    {/* Protected routes */}
-                    <Route
-                        path="/"
-                        element={
-                            <ProtectedRoute>
-                                <TrumpetAnalyzer />
-                            </ProtectedRoute>
-                        }
-                    />
-                    <Route
-                        path="/profile"
-                        element={
-                            <ProtectedRoute>
-                                <ProfileSettings />
-                            </ProtectedRoute>
-                        }
-                    />
+                        {/* Protected routes */}
+                        <Route
+                            path="/"
+                            element={
+                                <ProtectedRoute>
+                                    <TrumpetAnalyzer />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/profile"
+                            element={
+                                <ProtectedRoute>
+                                    <ProfileSettings />
+                                </ProtectedRoute>
+                            }
+                        />
 
-                    {/* Catch all - redirect to home */}
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-            </Router>
-        </AuthProvider>
+                        {/* Catch all - redirect to home */}
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                </Router>
+            </AuthProvider>
+        </Provider>
     );
 }
 

@@ -2,10 +2,12 @@
 import BreathAnalysisCard from './BreathAnalysisCard';
 import ToneAnalysisCard from './ToneAnalysisCard';
 import RhythmAnalysisCard from './RhythmAnalysisCard';
+import ExpressionAnalysisCard from './ExpressionAnalysisCard';
+import FlexibilityAnalysisCard from './FlexibilityAnalysisCard';
 
 const TechnicalAnalysis = ({ technicalData }) => {
     if (!technicalData || Object.keys(technicalData).length === 0) return null;
-
+    console.log(technicalData);
     return (
         <div className="mb-6">
             <h3 className="text-lg font-medium text-gray-800 mb-3">Technical Analysis</h3>
@@ -18,6 +20,12 @@ const TechnicalAnalysis = ({ technicalData }) => {
                 )}
                 {technicalData.rhythm_timing && (
                     <RhythmAnalysisCard rhythmData={technicalData.rhythm_timing} />
+                )}
+                {technicalData.expression && (
+                    <ExpressionAnalysisCard expressionData={technicalData.expression} />
+                )}
+                {technicalData.flexibility && (
+                    <FlexibilityAnalysisCard flexibilityData={technicalData.flexibility} />
                 )}
             </div>
         </div>

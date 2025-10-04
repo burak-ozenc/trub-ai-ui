@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { Mic, MicOff, Send, Upload, Music, MessageCircle, BarChart3, Loader2, User, Settings } from 'lucide-react';
+import AnalysisResults from "./Analyzer/AnalysisResults";
 
 const TrumpetAnalyzer = () => {
     const navigate = useNavigate();
@@ -223,68 +224,7 @@ const TrumpetAnalyzer = () => {
 
                         {/* Analysis Results */}
                         {analysisResult && (
-                            <div className="bg-white rounded-lg shadow-sm p-6">
-                                <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                    <BarChart3 className="w-5 h-5" />
-                                    Analysis Results
-                                </h2>
-
-                                {/* LLM Feedback */}
-                                <div className="mb-6">
-                                    <h3 className="text-lg font-medium text-gray-800 mb-2">Teacher Feedback</h3>
-                                    <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
-                                        <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">
-                                            {analysisResult.feedback}
-                                        </pre>
-                                    </div>
-                                </div>
-
-                                {/* Technical Analysis */}
-                                {analysisResult.technical_analysis && Object.keys(analysisResult.technical_analysis).length > 0 && (
-                                    <div className="mb-6">
-                                        <h3 className="text-lg font-medium text-gray-800 mb-2">Technical Analysis</h3>
-                                        <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
-                                            {Object.entries(analysisResult.technical_analysis).map(([key, value]) => (
-                                                <div key={key} className="mb-3 last:mb-0">
-                                                    <h4 className="font-medium text-gray-700 capitalize mb-1">
-                                                        {key.replace('_', ' ')}
-                                                    </h4>
-                                                    <div className="text-sm text-gray-600">
-                                                        {typeof value === 'object' ? (
-                                                            <ul className="space-y-1">
-                                                                {Object.entries(value).map(([subKey, subValue]) => (
-                                                                    <li key={subKey}>
-                                                                        <span className="font-medium">{subKey.replace('_', ' ')}:</span> {String(subValue)}
-                                                                    </li>
-                                                                ))}
-                                                            </ul>
-                                                        ) : (
-                                                            String(value)
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Recommendations */}
-                                {analysisResult.recommendations && analysisResult.recommendations.length > 0 && (
-                                    <div>
-                                        <h3 className="text-lg font-medium text-gray-800 mb-2">Practice Recommendations</h3>
-                                        <div className="bg-green-50 border border-green-200 rounded-md p-4">
-                                            <ul className="space-y-2">
-                                                {analysisResult.recommendations.map((rec, index) => (
-                                                    <li key={index} className="text-sm text-gray-700">
-                                                        <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-2"></span>
-                                                        {rec}
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
+                            <AnalysisResults analysisResult={analysisResult} />
                         )}
                     </div>
 
