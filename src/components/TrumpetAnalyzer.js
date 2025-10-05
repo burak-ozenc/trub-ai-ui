@@ -1,13 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
-import { Mic, MicOff, Send, Upload, Music, MessageCircle, BarChart3, Loader2, User, Settings } from 'lucide-react';
+import { useAppDispatch } from '../store/hooks';
+import { saveRecordingToDb, fetchRecordings } from '../store/slices/recordingsSlice';
+import { Mic, MicOff, Send, Upload, Music, MessageCircle, Settings, Loader2 } from 'lucide-react';
 import AnalysisResults from "./Analyzer/AnalysisResults";
+import RecordingHistory from "./Analyzer/RecordingHistory";
 
 const TrumpetAnalyzer = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
+    const dispatch = useAppDispatch();
+
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
     const [error, setError] = useState('');
@@ -26,6 +31,11 @@ const TrumpetAnalyzer = () => {
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
     const fileInputRef = useRef(null);
+
+    // Fetch recordings on mount
+    useEffect(() => {
+        dispatch(fetchRecordings());
+    }, [dispatch]);
 
     // Recording functions
     const startRecording = async () => {
@@ -83,6 +93,21 @@ const TrumpetAnalyzer = () => {
             const data = await api.analyzeAudio(audioBlob, guidance, 'full');
             setAnalysisResult(data);
 
+            // Save to database
+            const fileName = `recording_${Date.now()}.wav`;
+            const tempId = Date.now().toString();
+            const recordingData = {
+                filename: fileName,
+                guidance: guidance,
+                analysis_type: 'full',
+                duration: 0, // Could calculate from audio blob if needed
+                analysis_results: data.technical_analysis || {},
+                audio_file_path: data.file_path || null  // NEW - Save audio file path from analysis response
+            };
+
+            // Dispatch to save to database with tempId as meta
+            dispatch(saveRecordingToDb({ ...recordingData, tempId }));
+
         } catch (err) {
             setError('Error analyzing audio: ' + err.message);
         } finally {
@@ -123,7 +148,7 @@ const TrumpetAnalyzer = () => {
 
     return (
         <div className="min-h-screen bg-gray-50 p-4">
-            <div className="max-w-6xl mx-auto">
+            <div className="max-w-7xl mx-auto">
                 {/* Header */}
                 <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
                     <div className="flex items-center justify-between">
@@ -150,9 +175,9 @@ const TrumpetAnalyzer = () => {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left Column - Recording & Analysis */}
-                    <div className="space-y-6">
+                    <div className="lg:col-span-2 space-y-6">
                         {/* Recording Section */}
                         <div className="bg-white rounded-lg shadow-sm p-6">
                             <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -226,10 +251,13 @@ const TrumpetAnalyzer = () => {
                         {analysisResult && (
                             <AnalysisResults analysisResult={analysisResult} />
                         )}
+
+                        {/* Recording History */}
+                        <RecordingHistory />
                     </div>
 
                     {/* Right Column - Chat */}
-                    <div className="bg-white rounded-lg shadow-sm p-6">
+                    <div className="bg-white rounded-lg shadow-sm p-6 h-fit">
                         <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
                             <MessageCircle className="w-5 h-5" />
                             Chat with AI Teacher

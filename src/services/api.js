@@ -112,6 +112,66 @@ class ApiClient {
         });
         return this.handleResponse(response);
     }
+
+    // Recording endpoints (NEW)
+    async saveRecording(recordingData) {
+        // Remove tempId before sending to backend
+        const { tempId, ...dataToSend } = recordingData;
+
+        const response = await fetch(`${this.baseURL}/recordings/`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(dataToSend),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getRecordings(skip = 0, limit = 50) {
+        const response = await fetch(`${this.baseURL}/recordings/?skip=${skip}&limit=${limit}`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getRecording(recordingId) {
+        const response = await fetch(`${this.baseURL}/recordings/${recordingId}`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getRecordingAudio(recordingId) {
+        const token = authUtils.getToken();
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(`${this.baseURL}/recordings/${recordingId}/audio`, {
+            headers,
+        });
+
+        if (!response.ok) {
+            throw new Error('Failed to fetch audio');
+        }
+
+        return response.blob();
+    }
+
+    async deleteRecording(recordingId) {
+        const response = await fetch(`${this.baseURL}/recordings/${recordingId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getRecordingCount() {
+        const response = await fetch(`${this.baseURL}/recordings/stats/count`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
 }
 
 export const api = new ApiClient(API_BASE_URL);
