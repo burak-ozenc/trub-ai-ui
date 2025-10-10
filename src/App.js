@@ -8,6 +8,7 @@ import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
 import TrumpetAnalyzer from './components/TrumpetAnalyzer';
 import ProfileSettings from './components/Profile/ProfileSettings';
+import ProgressDashboard from './components/Progress/ProgressDashboard';
 
 function App() {
     return (
@@ -33,6 +34,14 @@ function App() {
                             element={
                                 <ProtectedRoute>
                                     <ProfileSettings />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/progress"
+                            element={
+                                <ProtectedRoute>
+                                    <ProgressDashboard />
                                 </ProtectedRoute>
                             }
                         />

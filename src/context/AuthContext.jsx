@@ -1,4 +1,4 @@
-﻿import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { authUtils } from '../utils/auth';
 import { api } from '../services/api';
 
@@ -16,9 +16,14 @@ export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const initAuthRef = useRef(false);
 
     // Check if user is logged in on mount
     useEffect(() => {
+        // Prevent duplicate initialization
+        if (initAuthRef.current) return;
+        initAuthRef.current = true;
+
         const initAuth = async () => {
             const token = authUtils.getToken();
             const savedUser = authUtils.getUser();
@@ -44,7 +49,7 @@ export const AuthProvider = ({ children }) => {
     const register = async (userData) => {
         try {
             setError(null);
-            const newUser = await api.register(userData);
+            await api.register(userData);
 
             // Auto-login after registration
             const loginData = await api.login(userData.username, userData.password);

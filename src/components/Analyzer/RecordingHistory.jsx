@@ -1,14 +1,13 @@
-﻿import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useAppSelector, useAppDispatch } from '../../store/hooks';
 import { deleteRecordingFromDb, setCurrentRecording, fetchRecordings } from '../../store/slices/recordingsSlice';
-import { api } from '../../services/api';
-import { History, Trash2, Play, Pause, Clock, Loader2, Volume2 } from 'lucide-react';
+import { History, Trash2, Play, Clock, Loader2 } from 'lucide-react';
 
 const RecordingHistory = () => {
     const dispatch = useAppDispatch();
     const { recordings, loading, error } = useAppSelector(state => state.recordings);
     const [playingId, setPlayingId] = useState(null);
-    const [loadingAudio, setLoadingAudio] = useState(null);
+    // const [loadingAudio, setLoadingAudio] = useState(null);
     const audioRef = useRef(new Audio());
 
     // Fetch recordings on mount
@@ -21,50 +20,11 @@ const RecordingHistory = () => {
         return () => {
             if (audioRef.current) {
                 audioRef.current.pause();
+                // eslint-disable-next-line react-hooks/exhaustive-deps
                 audioRef.current.src = '';
             }
         };
     }, []);
-
-    const handlePlay = async (recording, e) => {
-        e.stopPropagation();
-
-        // If already playing this recording, pause it
-        if (playingId === recording.id) {
-            audioRef.current.pause();
-            setPlayingId(null);
-            return;
-        }
-
-        // If playing another recording, stop it first
-        if (playingId !== null) {
-            audioRef.current.pause();
-        }
-
-        try {
-            setLoadingAudio(recording.id);
-
-            // Fetch audio from backend
-            const audioBlob = await api.getRecordingAudio(recording.id);
-            const audioUrl = URL.createObjectURL(audioBlob);
-
-            // Set up audio
-            audioRef.current.src = audioUrl;
-            audioRef.current.onended = () => {
-                setPlayingId(null);
-                URL.revokeObjectURL(audioUrl);
-            };
-
-            // Play audio
-            await audioRef.current.play();
-            setPlayingId(recording.id);
-        } catch (err) {
-            console.error('Error playing audio:', err);
-            alert('Failed to play audio: ' + err.message);
-        } finally {
-            setLoadingAudio(null);
-        }
-    };
 
     const handleView = (recording) => {
         dispatch(setCurrentRecording(recording));
@@ -140,12 +100,13 @@ const RecordingHistory = () => {
                 {recordings.map((recording) => (
                     <div
                         key={recording.id}
-                        className="border border-gray-200 rounded-md p-4 hover:bg-gray-50 transition-colors"
+                        className="border border-gray-200 rounded-md p-4 hover:bg-gray-50 cursor-pointer transition-colors"
+                        onClick={() => handleView(recording)}
                     >
                         <div className="flex items-start justify-between">
-                            <div className="flex-1" onClick={() => handleView(recording)} className="cursor-pointer">
+                            <div className="flex-1">
                                 <div className="flex items-center gap-2 mb-2">
-                                    <Volume2 className="w-4 h-4 text-blue-600" />
+                                    <Play className="w-4 h-4 text-blue-600" />
                                     <span className="font-medium text-gray-900">
                                         {recording.filename || recording.fileName || `Recording ${recording.id}`}
                                     </span>
@@ -165,35 +126,14 @@ const RecordingHistory = () => {
                                     )}
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2 ml-2">
-                                {/* Play/Pause Button */}
-                                {recording.audio_file_path && (
-                                    <button
-                                        onClick={(e) => handlePlay(recording, e)}
-                                        disabled={loadingAudio === recording.id}
-                                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition-colors disabled:opacity-50"
-                                        title={playingId === recording.id ? "Pause" : "Play"}
-                                    >
-                                        {loadingAudio === recording.id ? (
-                                            <Loader2 className="w-4 h-4 animate-spin" />
-                                        ) : playingId === recording.id ? (
-                                            <Pause className="w-4 h-4" />
-                                        ) : (
-                                            <Play className="w-4 h-4" />
-                                        )}
-                                    </button>
-                                )}
-
-                                {/* Delete Button */}
-                                <button
-                                    onClick={(e) => handleDelete(recording.id, e)}
-                                    disabled={loading}
-                                    className="p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
-                                    title="Delete recording"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
-                            </div>
+                            <button
+                                onClick={(e) => handleDelete(recording.id, e)}
+                                disabled={loading}
+                                className="ml-2 p-2 text-red-600 hover:bg-red-50 rounded-md transition-colors disabled:opacity-50"
+                                title="Delete recording"
+                            >
+                                <Trash2 className="w-4 h-4" />
+                            </button>
                         </div>
                     </div>
                 ))}

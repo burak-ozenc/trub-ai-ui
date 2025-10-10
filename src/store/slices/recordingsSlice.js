@@ -1,4 +1,4 @@
-﻿import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { api } from '../../services/api';
 
 const initialState = {
@@ -7,7 +7,8 @@ const initialState = {
     isPlaying: false,
     playingId: null,
     loading: false,
-    error: null
+    error: null,
+    hasFetched: false  // NEW - Track if we've fetched
 };
 
 // Async thunks for API calls

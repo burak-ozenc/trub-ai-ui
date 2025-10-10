@@ -1,10 +1,10 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { useAppDispatch } from '../store/hooks';
-import { saveRecordingToDb, fetchRecordings } from '../store/slices/recordingsSlice';
-import { Mic, MicOff, Send, Upload, Music, MessageCircle, Settings, Loader2 } from 'lucide-react';
+import { saveRecordingToDb } from '../store/slices/recordingsSlice';
+import { Mic, MicOff, Send, Upload, Music, MessageCircle, Settings, Loader2, BarChart3 } from 'lucide-react';
 import AnalysisResults from "./Analyzer/AnalysisResults";
 import RecordingHistory from "./Analyzer/RecordingHistory";
 
@@ -32,10 +32,7 @@ const TrumpetAnalyzer = () => {
     const audioChunks = useRef([]);
     const fileInputRef = useRef(null);
 
-    // Fetch recordings on mount
-    useEffect(() => {
-        dispatch(fetchRecordings());
-    }, [dispatch]);
+    // No useEffect here - RecordingHistory handles its own fetching
 
     // Recording functions
     const startRecording = async () => {
@@ -164,6 +161,13 @@ const TrumpetAnalyzer = () => {
                                 <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.username}</p>
                                 <p className="text-xs text-gray-500">{user?.email}</p>
                             </div>
+                            <button
+                                onClick={() => navigate('/progress')}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors"
+                            >
+                                <BarChart3 className="w-4 h-4" />
+                                Progress
+                            </button>
                             <button
                                 onClick={() => navigate('/profile')}
                                 className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"

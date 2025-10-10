@@ -1,4 +1,4 @@
-﻿import { authUtils } from '../utils/auth';
+import { authUtils } from '../utils/auth';
 
 const API_BASE_URL = 'http://localhost:8002';
 
@@ -30,6 +30,12 @@ class ApiClient {
             const error = await response.json().catch(() => ({ detail: 'An error occurred' }));
             throw new Error(error.detail || 'Request failed');
         }
+
+        // Handle 204 No Content responses (like DELETE)
+        if (response.status === 204) {
+            return null;
+        }
+
         return response.json();
     }
 
@@ -168,6 +174,13 @@ class ApiClient {
 
     async getRecordingCount() {
         const response = await fetch(`${this.baseURL}/recordings/stats/count`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getProgressStats() {
+        const response = await fetch(`${this.baseURL}/recordings/stats/progress`, {
             headers: this.getHeaders(true),
         });
         return this.handleResponse(response);
