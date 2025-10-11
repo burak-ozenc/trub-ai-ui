@@ -4,9 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { useAppDispatch } from '../store/hooks';
 import { saveRecordingToDb } from '../store/slices/recordingsSlice';
-import { Mic, MicOff, Send, Upload, Music, MessageCircle, Settings, Loader2, BarChart3 } from 'lucide-react';
-import AnalysisResults from "./Analyzer/AnalysisResults";
-import RecordingHistory from "./Analyzer/RecordingHistory";
+import { Music, MessageCircle, Settings, Send, Loader2, BarChart3 } from 'lucide-react';
+import GuidancePrompt from './Analyzer/GuidancePrompt';
+import RecordButton from './Analyzer/RecordButton';
+import MetronomeWidget from './Analyzer/MetronomeWidget';
+import AnalysisResults from './Analyzer/AnalysisResults';
+import RecordingHistory from './Analyzer/RecordingHistory';
 
 const TrumpetAnalyzer = () => {
     const navigate = useNavigate();
@@ -27,15 +30,30 @@ const TrumpetAnalyzer = () => {
     const [chatQuestion, setChatQuestion] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
 
+    // UI state
+    const [historyCollapsed, setHistoryCollapsed] = useState(true);
+    const [resultsCollapsed, setResultsCollapsed] = useState(false);
+
     // Refs
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
-    const fileInputRef = useRef(null);
-
-    // No useEffect here - RecordingHistory handles its own fetching
+    // const fileInputRef = useRef(null);
 
     // Recording functions
+    const toggleRecording = async () => {
+        if (isRecording) {
+            stopRecording();
+        } else {
+            startRecording();
+        }
+    };
+
     const startRecording = async () => {
+        if (!guidance.trim()) {
+            setError('Please enter your practice goal first');
+            return;
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder.current = new MediaRecorder(stream);
@@ -68,23 +86,11 @@ const TrumpetAnalyzer = () => {
         }
     };
 
-    // File upload
-    const handleFileUpload = (event) => {
-        const file = event.target.files[0];
-        if (file) {
-            analyzeAudio(file);
-        }
-    };
-
     // Analysis function
     const analyzeAudio = async (audioBlob) => {
-        if (!guidance.trim()) {
-            setError('Please enter a question or guidance text');
-            return;
-        }
-
         setIsAnalyzing(true);
         setError('');
+        setResultsCollapsed(false); // Expand results when analysis starts
 
         try {
             const data = await api.analyzeAudio(audioBlob, guidance, 'full');
@@ -97,12 +103,11 @@ const TrumpetAnalyzer = () => {
                 filename: fileName,
                 guidance: guidance,
                 analysis_type: 'full',
-                duration: 0, // Could calculate from audio blob if needed
+                duration: 0,
                 analysis_results: data.technical_analysis || {},
-                audio_file_path: data.file_path || null  // NEW - Save audio file path from analysis response
+                audio_file_path: data.file_path || null
             };
 
-            // Dispatch to save to database with tempId as meta
             dispatch(saveRecordingToDb({ ...recordingData, tempId }));
 
         } catch (err) {
@@ -144,18 +149,21 @@ const TrumpetAnalyzer = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 p-4">
-            <div className="max-w-7xl mx-auto">
-                {/* Header */}
-                <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-teal-50">
+            {/* Header */}
+            <div className="bg-white shadow-sm border-b border-gray-200">
+                <div className="max-w-7xl mx-auto px-6 py-4">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <Music className="w-8 h-8 text-blue-600" />
+                            <div className="p-2 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg">
+                                <Music className="w-6 h-6 text-white" />
+                            </div>
                             <div>
-                                <h1 className="text-3xl font-bold text-gray-900">Trumpet Analyzer</h1>
-                                <p className="text-gray-600 mt-1">AI-powered trumpet performance analysis and coaching</p>
+                                <h1 className="text-2xl font-bold text-gray-900">Trumpet Analyzer</h1>
+                                <p className="text-sm text-gray-500">AI-powered performance coaching</p>
                             </div>
                         </div>
+
                         <div className="flex items-center gap-3">
                             <div className="text-right mr-3">
                                 <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.username}</p>
@@ -163,14 +171,14 @@ const TrumpetAnalyzer = () => {
                             </div>
                             <button
                                 onClick={() => navigate('/progress')}
-                                className="flex items-center gap-2 px-4 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 rounded-md transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors"
                             >
                                 <BarChart3 className="w-4 h-4" />
                                 Progress
                             </button>
                             <button
                                 onClick={() => navigate('/profile')}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-md transition-colors"
+                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
                             >
                                 <Settings className="w-4 h-4" />
                                 Settings
@@ -178,99 +186,75 @@ const TrumpetAnalyzer = () => {
                         </div>
                     </div>
                 </div>
+            </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Left Column - Recording & Analysis */}
-                    <div className="lg:col-span-2 space-y-6">
-                        {/* Recording Section */}
-                        <div className="bg-white rounded-lg shadow-sm p-6">
-                            <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                                <Mic className="w-5 h-5" />
-                                Record & Analyze
-                            </h2>
-
-                            {/* Guidance Input */}
-                            <div className="mb-4">
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Your Question or Guidance
-                                </label>
-                                <textarea
+            {/* Main Content */}
+            <div className={`transition-all duration-300 ${historyCollapsed ? 'mr-0' : 'mr-96'}`}>
+                <div className="max-w-6xl mx-auto px-6 py-12">
+                    {/* Hero Recording Section */}
+                    <div className="mb-12">
+                        <div className="bg-white rounded-3xl shadow-xl p-12">
+                            {/* Guidance Prompt */}
+                            <div className="mb-12">
+                                <GuidancePrompt
                                     value={guidance}
-                                    onChange={(e) => setGuidance(e.target.value)}
-                                    placeholder="What would you like feedback on? (e.g., 'How is my breathing?', 'Is my tone quality good?')"
-                                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                                    rows={3}
+                                    onChange={setGuidance}
+                                    disabled={isRecording || isAnalyzing}
                                 />
                             </div>
 
-                            {/* Recording Controls */}
-                            <div className="flex gap-3 mb-4">
-                                <button
-                                    onClick={isRecording ? stopRecording : startRecording}
-                                    disabled={isAnalyzing}
-                                    className={`flex items-center gap-2 px-4 py-2 rounded-md font-medium transition-colors ${
-                                        isRecording
-                                            ? 'bg-red-600 hover:bg-red-700 text-white'
-                                            : 'bg-blue-600 hover:bg-blue-700 text-white'
-                                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                                >
-                                    {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                                    {isRecording ? 'Stop Recording' : 'Start Recording'}
-                                </button>
-
-                                <input
-                                    type="file"
-                                    ref={fileInputRef}
-                                    onChange={handleFileUpload}
-                                    accept="audio/*"
-                                    className="hidden"
+                            {/* Record Button */}
+                            <div className="flex justify-center mb-8">
+                                <RecordButton
+                                    isRecording={isRecording}
+                                    isAnalyzing={isAnalyzing}
+                                    onToggle={toggleRecording}
+                                    disabled={!guidance.trim()}
                                 />
-
-                                <button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    disabled={isAnalyzing}
-                                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-md font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <Upload className="w-4 h-4" />
-                                    Upload File
-                                </button>
                             </div>
 
-                            {/* Status Messages */}
-                            {isAnalyzing && (
-                                <div className="flex items-center gap-2 text-blue-600 mb-4">
-                                    <Loader2 className="w-4 h-4 animate-spin" />
-                                    Analyzing your performance...
-                                </div>
-                            )}
-
+                            {/* Error Message */}
                             {error && (
-                                <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md mb-4">
-                                    {error}
+                                <div className="max-w-2xl mx-auto">
+                                    <div className="bg-red-50 border-2 border-red-200 text-red-600 px-6 py-4 rounded-xl text-center">
+                                        {error}
+                                    </div>
                                 </div>
                             )}
                         </div>
-
-                        {/* Analysis Results */}
-                        {analysisResult && (
-                            <AnalysisResults analysisResult={analysisResult} />
-                        )}
-
-                        {/* Recording History */}
-                        <RecordingHistory />
                     </div>
 
-                    {/* Right Column - Chat */}
-                    <div className="bg-white rounded-lg shadow-sm p-6 h-fit">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                            <MessageCircle className="w-5 h-5" />
+                    {/* Analysis Results - Collapsible */}
+                    {analysisResult && (
+                        <div className="mb-12">
+                            <button
+                                onClick={() => setResultsCollapsed(!resultsCollapsed)}
+                                className="w-full flex items-center justify-between bg-white px-6 py-4 rounded-t-2xl shadow-lg hover:bg-gray-50 transition-colors"
+                            >
+                                <h2 className="text-xl font-semibold text-gray-900">Analysis Results</h2>
+                                <span className="text-teal-600 text-sm font-medium">
+                                    {resultsCollapsed ? 'Show' : 'Hide'}
+                                </span>
+                            </button>
+                            {!resultsCollapsed && (
+                                <div className="bg-white rounded-b-2xl shadow-lg">
+                                    <AnalysisResults analysisResult={analysisResult} />
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* AI Chat Section */}
+                    <div className="bg-white rounded-3xl shadow-xl p-8">
+                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
+                            <MessageCircle className="w-6 h-6 text-teal-600" />
                             Chat with AI Teacher
                         </h2>
 
                         {/* Chat Messages */}
-                        <div className="h-96 overflow-y-auto border border-gray-200 rounded-md p-4 mb-4 space-y-3">
+                        <div className="h-80 overflow-y-auto border-2 border-gray-100 rounded-2xl p-6 mb-6 space-y-4 bg-gray-50">
                             {chatMessages.length === 0 ? (
-                                <div className="text-gray-500 text-center py-8">
+                                <div className="text-gray-400 text-center py-12">
                                     Ask me anything about trumpet technique, practice methods, or music theory!
                                 </div>
                             ) : (
@@ -280,12 +264,12 @@ const TrumpetAnalyzer = () => {
                                         className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
                                     >
                                         <div
-                                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                                            className={`max-w-md px-6 py-3 rounded-2xl ${
                                                 message.type === 'user'
-                                                    ? 'bg-blue-600 text-white'
+                                                    ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white'
                                                     : message.type === 'error'
-                                                        ? 'bg-red-100 text-red-700 border border-red-200'
-                                                        : 'bg-gray-100 text-gray-800'
+                                                        ? 'bg-red-100 text-red-700 border-2 border-red-200'
+                                                        : 'bg-white text-gray-800 border-2 border-gray-200'
                                             }`}
                                         >
                                             <pre className="whitespace-pre-wrap text-sm font-sans">
@@ -298,8 +282,8 @@ const TrumpetAnalyzer = () => {
 
                             {isChatLoading && (
                                 <div className="flex justify-start">
-                                    <div className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg flex items-center gap-2">
-                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                    <div className="bg-white text-gray-800 px-6 py-3 rounded-2xl flex items-center gap-2 border-2 border-gray-200">
+                                        <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
                                         Thinking...
                                     </div>
                                 </div>
@@ -307,27 +291,36 @@ const TrumpetAnalyzer = () => {
                         </div>
 
                         {/* Chat Input */}
-                        <div className="flex gap-2">
+                        <div className="flex gap-3">
                             <input
                                 type="text"
                                 value={chatQuestion}
                                 onChange={(e) => setChatQuestion(e.target.value)}
                                 onKeyPress={handleKeyPress}
                                 placeholder="Ask about trumpet technique..."
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20 transition-all"
                                 disabled={isChatLoading}
                             />
                             <button
                                 onClick={sendChatMessage}
                                 disabled={isChatLoading || !chatQuestion.trim()}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="px-6 py-4 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
                             >
-                                <Send className="w-4 h-4" />
+                                <Send className="w-5 h-5" />
                             </button>
                         </div>
                     </div>
                 </div>
             </div>
+
+            {/* Metronome Widget */}
+            <MetronomeWidget />
+
+            {/* Recording History Sidebar */}
+            <RecordingHistory
+                isCollapsed={historyCollapsed}
+                onToggle={() => setHistoryCollapsed(!historyCollapsed)}
+            />
         </div>
     );
 };

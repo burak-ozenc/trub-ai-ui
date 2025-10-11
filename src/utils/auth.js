@@ -1,4 +1,4 @@
-﻿// Token storage utilities
+// Token storage utilities
 const TOKEN_KEY = 'trumpet_analyzer_token';
 const USER_KEY = 'trumpet_analyzer_user';
 

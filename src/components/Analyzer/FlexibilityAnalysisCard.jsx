@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import {Zap} from 'lucide-react';
 
 const FlexibilityAnalysisCard = ({flexibilityData}) => {

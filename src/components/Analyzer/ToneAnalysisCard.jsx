@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Volume2 } from 'lucide-react';
 
 const ToneAnalysisCard = ({ toneData }) => {

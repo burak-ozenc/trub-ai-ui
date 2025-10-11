@@ -1,4 +1,4 @@
-﻿import { configureStore } from '@reduxjs/toolkit';
+import { configureStore } from '@reduxjs/toolkit';
 import recordingsReducer from './slices/recordingsSlice';
 import settingsReducer from './slices/settingsSlice';
 

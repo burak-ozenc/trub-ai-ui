@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Lightbulb } from 'lucide-react';
 
 const Recommendations = ({ recommendations }) => {

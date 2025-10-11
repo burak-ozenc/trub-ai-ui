@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { MessageSquare } from 'lucide-react';
 
 const FeedbackDisplay = ({ feedback }) => {

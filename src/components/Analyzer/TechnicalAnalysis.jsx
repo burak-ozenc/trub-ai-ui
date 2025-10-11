@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import BreathAnalysisCard from './BreathAnalysisCard';
 import ToneAnalysisCard from './ToneAnalysisCard';
 import RhythmAnalysisCard from './RhythmAnalysisCard';

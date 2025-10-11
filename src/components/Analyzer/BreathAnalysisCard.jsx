@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Wind } from 'lucide-react';
 
 const BreathAnalysisCard = ({ breathData }) => {
