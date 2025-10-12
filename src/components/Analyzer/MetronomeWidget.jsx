@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Music, Play, Pause, Minus, Plus } from 'lucide-react';
 import useMetronome from '../../hooks/useMetronome';
 
@@ -8,7 +8,7 @@ const MetronomeWidget = ({ isCollapsed, onToggle }) => {
     const handleBpmChange = (delta) => {
         changeBpm(bpm + delta);
     };
-
+    
     return (
         <>
             {/* Expanded Content */}

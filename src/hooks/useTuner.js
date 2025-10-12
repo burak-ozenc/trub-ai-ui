@@ -1,4 +1,4 @@
-﻿import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 
 const useTuner = (skillLevel = 'intermediate') => {
     const [isActive, setIsActive] = useState(false);
@@ -13,7 +13,6 @@ const useTuner = (skillLevel = 'intermediate') => {
     const streamRef = useRef(null);
     const animationFrameRef = useRef(null);
     const bufferRef = useRef(null);
-    const smoothedCentsRef = useRef(0);  // For smoothing
 
     // Note names
     const noteStrings = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
@@ -36,6 +35,7 @@ const useTuner = (skillLevel = 'intermediate') => {
         const cents = Math.floor((noteNum - Math.round(noteNum)) * 100);
 
         return { noteName, octave, cents, noteIndex };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     // Get target frequency for a note

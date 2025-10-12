@@ -1,5 +1,5 @@
-﻿import React, {useState} from 'react';
-import {Music, Play, Pause, ChevronLeft, ChevronRight, ChevronDown, ChevronUp, Minus, Plus} from 'lucide-react';
+import React, {useState} from 'react';
+import {Music, Play, Pause, ChevronDown, ChevronUp, Minus, Plus} from 'lucide-react';
 import useMetronome from '../../hooks/useMetronome';
 
 const MetronomeSidebar = () => {

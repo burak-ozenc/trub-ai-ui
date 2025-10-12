@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { MessageCircle, Send, Loader2 } from 'lucide-react';
 
 const ChatSidebar = ({

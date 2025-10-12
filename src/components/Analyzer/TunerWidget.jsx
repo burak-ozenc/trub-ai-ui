@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Radio, ChevronDown, ChevronUp, Play, Pause } from 'lucide-react';
 import useTuner from '../../hooks/useTuner';
 
@@ -10,10 +10,7 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
         frequency,
         cents,
         targetFrequency,
-        stability,
-        isInTune,
         statusColor,
-        tolerance,
         toggle
     } = useTuner(skillLevel);
 
