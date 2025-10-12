@@ -1,6 +1,6 @@
 import { authUtils } from '../utils/auth';
 
-const API_BASE_URL = 'http://localhost:8002';
+const API_BASE_URL = 'http://localhost:8001';
 
 // Create API client with auth support
 class ApiClient {
