@@ -1,7 +1,5 @@
 import { authUtils } from '../utils/auth';
 
-const API_BASE_URL = 'http://localhost:8001';
-
 // Create API client with auth support
 class ApiClient {
     constructor(baseURL) {
@@ -187,4 +185,4 @@ class ApiClient {
     }
 }
 
-export const api = new ApiClient(API_BASE_URL);
+export const api = new ApiClient(process.env.REACT_APP_BACKEND_URL);
