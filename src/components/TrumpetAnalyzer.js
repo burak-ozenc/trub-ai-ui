@@ -4,12 +4,14 @@ import { useAuth } from '../context/AuthContext';
 import { api } from '../services/api';
 import { useAppDispatch } from '../store/hooks';
 import { saveRecordingToDb } from '../store/slices/recordingsSlice';
-import { Music, MessageCircle, Settings, Send, Loader2, BarChart3 } from 'lucide-react';
+import { Music, Settings, BarChart3, MessageCircle, ChevronLeft, ChevronRight } from 'lucide-react';
+import TunerWidget from './Analyzer/TunerWidget';
 import GuidancePrompt from './Analyzer/GuidancePrompt';
 import RecordButton from './Analyzer/RecordButton';
-import MetronomeWidget from './Analyzer/MetronomeWidget';
 import AnalysisResults from './Analyzer/AnalysisResults';
 import RecordingHistory from './Analyzer/RecordingHistory';
+import MetronomeSidebar from './Analyzer/MetronomeSidebar';
+import ChatSidebar from './Analyzer/ChatSidebar';
 
 const TrumpetAnalyzer = () => {
     const navigate = useNavigate();
@@ -32,12 +34,16 @@ const TrumpetAnalyzer = () => {
 
     // UI state
     const [historyCollapsed, setHistoryCollapsed] = useState(true);
+    const [chatCollapsed, setChatCollapsed] = useState(true);
+    const [tunerMinimized, setTunerMinimized] = useState(false);
     const [resultsCollapsed, setResultsCollapsed] = useState(false);
 
     // Refs
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
-    // const fileInputRef = useRef(null);
+
+    // Get user skill level
+    const skillLevel = user?.skill_level || 'intermediate';
 
     // Recording functions
     const toggleRecording = async () => {
@@ -80,8 +86,6 @@ const TrumpetAnalyzer = () => {
         if (mediaRecorder.current && isRecording) {
             mediaRecorder.current.stop();
             setIsRecording(false);
-
-            // Stop all tracks
             mediaRecorder.current.stream.getTracks().forEach(track => track.stop());
         }
     };
@@ -90,13 +94,12 @@ const TrumpetAnalyzer = () => {
     const analyzeAudio = async (audioBlob) => {
         setIsAnalyzing(true);
         setError('');
-        setResultsCollapsed(false); // Expand results when analysis starts
+        setResultsCollapsed(false);
 
         try {
             const data = await api.analyzeAudio(audioBlob, guidance, 'full');
             setAnalysisResult(data);
 
-            // Save to database
             const fileName = `recording_${Date.now()}.wav`;
             const tempId = Date.now().toString();
             const recordingData = {
@@ -132,7 +135,6 @@ const TrumpetAnalyzer = () => {
             const data = await api.askQuestion(currentQuestion);
             const botMessage = { type: 'bot', content: data.answer };
             setChatMessages(prev => [...prev, botMessage]);
-
         } catch (err) {
             const errorMessage = { type: 'error', content: 'Failed to get response: ' + err.message };
             setChatMessages(prev => [...prev, errorMessage]);
@@ -149,36 +151,38 @@ const TrumpetAnalyzer = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-teal-50">
+        <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50">
             {/* Header */}
-            <div className="bg-white shadow-sm border-b border-gray-200">
-                <div className="max-w-7xl mx-auto px-6 py-4">
+            <div className="bg-white shadow-sm border-b-2 border-orange-100">
+                <div className="max-w-7xl mx-auto px-6 py-3">
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gradient-to-br from-teal-500 to-teal-600 rounded-lg">
+                            <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg">
                                 <Music className="w-6 h-6 text-white" />
                             </div>
                             <div>
-                                <h1 className="text-2xl font-bold text-gray-900">Trumpet Analyzer</h1>
-                                <p className="text-sm text-gray-500">AI-powered performance coaching</p>
+                                <h1 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text text-transparent">
+                                    Trumpet Analyzer
+                                </h1>
+                                <p className="text-xs text-gray-500">AI-powered coaching</p>
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-3">
-                            <div className="text-right mr-3">
+                        <div className="flex items-center gap-2">
+                            <div className="text-right mr-2">
                                 <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.username}</p>
                                 <p className="text-xs text-gray-500">{user?.email}</p>
                             </div>
                             <button
                                 onClick={() => navigate('/progress')}
-                                className="flex items-center gap-2 px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors"
+                                className="flex items-center gap-2 px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors text-sm font-medium"
                             >
                                 <BarChart3 className="w-4 h-4" />
                                 Progress
                             </button>
                             <button
                                 onClick={() => navigate('/profile')}
-                                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+                                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
                             >
                                 <Settings className="w-4 h-4" />
                                 Settings
@@ -188,139 +192,116 @@ const TrumpetAnalyzer = () => {
                 </div>
             </div>
 
-            {/* Main Content */}
-            <div className={`transition-all duration-300 ${historyCollapsed ? 'mr-0' : 'mr-96'}`}>
-                <div className="max-w-6xl mx-auto px-6 py-12">
-                    {/* Hero Recording Section */}
-                    <div className="mb-12">
-                        <div className="bg-white rounded-3xl shadow-xl p-12">
-                            {/* Guidance Prompt */}
-                            <div className="mb-12">
-                                <GuidancePrompt
-                                    value={guidance}
-                                    onChange={setGuidance}
-                                    disabled={isRecording || isAnalyzing}
-                                />
-                            </div>
+            {/* Main Content with dynamic margins for sidebars */}
+            <div className={`transition-all duration-300 ${
+                chatCollapsed ? 'ml-0' : 'ml-[36rem]'
+            } ${
+                historyCollapsed ? 'mr-0' : 'mr-96'
+            }`}>
+                <div className="max-w-5xl mx-auto px-6 py-8">
 
-                            {/* Record Button */}
-                            <div className="flex justify-center mb-8">
-                                <RecordButton
-                                    isRecording={isRecording}
-                                    isAnalyzing={isAnalyzing}
-                                    onToggle={toggleRecording}
-                                    disabled={!guidance.trim()}
-                                />
-                            </div>
+                    {/* Hero Tuner Section */}
+                    <div className="mb-8">
+                        <TunerWidget
+                            skillLevel={skillLevel}
+                            isMinimized={tunerMinimized}
+                            onToggleMinimize={() => setTunerMinimized(!tunerMinimized)}
+                        />
+                    </div>
 
-                            {/* Error Message */}
-                            {error && (
-                                <div className="max-w-2xl mx-auto">
-                                    <div className="bg-red-50 border-2 border-red-200 text-red-600 px-6 py-4 rounded-xl text-center">
-                                        {error}
-                                    </div>
-                                </div>
-                            )}
+                    {/* Recording Section */}
+                    <div className="bg-white rounded-2xl shadow-lg p-8 mb-8 border-2 border-orange-100">
+                        {/* Guidance Prompt */}
+                        <div className="mb-6">
+                            <GuidancePrompt
+                                value={guidance}
+                                onChange={setGuidance}
+                                disabled={isRecording || isAnalyzing}
+                            />
                         </div>
+
+                        {/* Record Button */}
+                        <div className="flex justify-center mb-4">
+                            <RecordButton
+                                isRecording={isRecording}
+                                isAnalyzing={isAnalyzing}
+                                onToggle={toggleRecording}
+                                disabled={!guidance.trim()}
+                            />
+                        </div>
+
+                        {/* Error Message */}
+                        {error && (
+                            <div className="max-w-xl mx-auto">
+                                <div className="bg-red-50 border-2 border-red-200 text-red-600 px-4 py-3 rounded-xl text-center text-sm">
+                                    {error}
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Analysis Results - Collapsible */}
                     {analysisResult && (
-                        <div className="mb-12">
+                        <div className="mb-8">
                             <button
                                 onClick={() => setResultsCollapsed(!resultsCollapsed)}
-                                className="w-full flex items-center justify-between bg-white px-6 py-4 rounded-t-2xl shadow-lg hover:bg-gray-50 transition-colors"
+                                className="w-full flex items-center justify-between bg-white px-6 py-3 rounded-t-xl shadow-lg hover:bg-orange-50 transition-colors border-2 border-orange-100"
                             >
-                                <h2 className="text-xl font-semibold text-gray-900">Analysis Results</h2>
-                                <span className="text-teal-600 text-sm font-medium">
+                                <h2 className="text-lg font-semibold text-gray-900">Analysis Results</h2>
+                                <span className="text-orange-600 text-sm font-medium">
                                     {resultsCollapsed ? 'Show' : 'Hide'}
                                 </span>
                             </button>
                             {!resultsCollapsed && (
-                                <div className="bg-white rounded-b-2xl shadow-lg">
+                                <div className="bg-white rounded-b-xl shadow-lg border-x-2 border-b-2 border-orange-100">
                                     <AnalysisResults analysisResult={analysisResult} />
                                 </div>
                             )}
                         </div>
                     )}
-
-                    {/* AI Chat Section */}
-                    <div className="bg-white rounded-3xl shadow-xl p-8">
-                        <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-2">
-                            <MessageCircle className="w-6 h-6 text-teal-600" />
-                            Chat with AI Teacher
-                        </h2>
-
-                        {/* Chat Messages */}
-                        <div className="h-80 overflow-y-auto border-2 border-gray-100 rounded-2xl p-6 mb-6 space-y-4 bg-gray-50">
-                            {chatMessages.length === 0 ? (
-                                <div className="text-gray-400 text-center py-12">
-                                    Ask me anything about trumpet technique, practice methods, or music theory!
-                                </div>
-                            ) : (
-                                chatMessages.map((message, index) => (
-                                    <div
-                                        key={index}
-                                        className={`flex ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}
-                                    >
-                                        <div
-                                            className={`max-w-md px-6 py-3 rounded-2xl ${
-                                                message.type === 'user'
-                                                    ? 'bg-gradient-to-r from-teal-500 to-teal-600 text-white'
-                                                    : message.type === 'error'
-                                                        ? 'bg-red-100 text-red-700 border-2 border-red-200'
-                                                        : 'bg-white text-gray-800 border-2 border-gray-200'
-                                            }`}
-                                        >
-                                            <pre className="whitespace-pre-wrap text-sm font-sans">
-                                                {message.content}
-                                            </pre>
-                                        </div>
-                                    </div>
-                                ))
-                            )}
-
-                            {isChatLoading && (
-                                <div className="flex justify-start">
-                                    <div className="bg-white text-gray-800 px-6 py-3 rounded-2xl flex items-center gap-2 border-2 border-gray-200">
-                                        <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
-                                        Thinking...
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Chat Input */}
-                        <div className="flex gap-3">
-                            <input
-                                type="text"
-                                value={chatQuestion}
-                                onChange={(e) => setChatQuestion(e.target.value)}
-                                onKeyPress={handleKeyPress}
-                                placeholder="Ask about trumpet technique..."
-                                className="flex-1 px-6 py-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-teal-500 focus:ring-4 focus:ring-teal-500/20 transition-all"
-                                disabled={isChatLoading}
-                            />
-                            <button
-                                onClick={sendChatMessage}
-                                disabled={isChatLoading || !chatQuestion.trim()}
-                                className="px-6 py-4 bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
-                            >
-                                <Send className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </div>
                 </div>
             </div>
 
-            {/* Metronome Widget */}
-            <MetronomeWidget />
+            {/* Chat Sidebar - Left - Even Wider */}
+            <div className={`fixed top-0 left-0 h-full shadow-2xl transition-all duration-300 z-30 ${
+                chatCollapsed ? 'w-0' : 'w-[36rem]'
+            }`}>
+                {/* Toggle Button */}
+                <button
+                    onClick={() => setChatCollapsed(!chatCollapsed)}
+                    className="absolute -right-12 top-32 bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-3 py-4 rounded-r-xl transition-colors shadow-lg flex flex-col items-center gap-1"
+                    title="AI Teacher Chat"
+                >
+                    {chatCollapsed ? (
+                        <>
+                            <ChevronRight className="w-5 h-5" />
+                            <MessageCircle className="w-4 h-4 mt-1" />
+                        </>
+                    ) : (
+                        <ChevronLeft className="w-5 h-5" />
+                    )}
+                </button>
 
-            {/* Recording History Sidebar */}
+                {!chatCollapsed && (
+                    <ChatSidebar
+                        messages={chatMessages}
+                        question={chatQuestion}
+                        isLoading={isChatLoading}
+                        onQuestionChange={setChatQuestion}
+                        onSend={sendChatMessage}
+                        onKeyPress={handleKeyPress}
+                    />
+                )}
+            </div>
+
+            {/* Recording History Sidebar - Right */}
             <RecordingHistory
                 isCollapsed={historyCollapsed}
                 onToggle={() => setHistoryCollapsed(!historyCollapsed)}
             />
+
+            {/* Metronome Sidebar - Bottom Right - Always visible, collapsible via header */}
+            <MetronomeSidebar />
         </div>
     );
 };

@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
-import { Music, Play, Pause, ChevronUp, ChevronDown, Minus, Plus } from 'lucide-react';
+import { Music, Play, Pause, Minus, Plus } from 'lucide-react';
 import useMetronome from '../../hooks/useMetronome';
 
-const MetronomeWidget = () => {
-    const [isExpanded, setIsExpanded] = useState(false);
+const MetronomeWidget = ({ isCollapsed, onToggle }) => {
     const { isPlaying, bpm, beatCount, toggle, changeBpm } = useMetronome();
 
     const handleBpmChange = (delta) => {
@@ -11,24 +10,31 @@ const MetronomeWidget = () => {
     };
 
     return (
-        <div className="fixed bottom-4 left-4 z-40">
-            {/* Expanded View */}
-            {isExpanded && (
-                <div className="bg-white rounded-t-2xl shadow-2xl border-2 border-teal-200 p-4 w-64 mb-0">
+        <>
+            {/* Expanded Content */}
+            {!isCollapsed && (
+                <div className="bg-white border-t-2 border-gray-200 p-4">
                     <div className="space-y-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-2">
+                                <Music className="w-5 h-5 text-teal-600" />
+                                <h3 className="font-semibold text-gray-900">Metronome</h3>
+                            </div>
+                        </div>
+
                         {/* BPM Display */}
                         <div className="text-center">
-                            <div className="text-4xl font-bold text-gray-800">{bpm}</div>
-                            <div className="text-sm text-gray-500">BPM</div>
+                            <div className="text-3xl font-bold text-gray-800">{bpm}</div>
+                            <div className="text-xs text-gray-500">BPM</div>
                         </div>
 
                         {/* BPM Controls */}
-                        <div className="flex items-center justify-center gap-3">
+                        <div className="flex items-center justify-center gap-2">
                             <button
                                 onClick={() => handleBpmChange(-5)}
                                 className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                             >
-                                <Minus className="w-5 h-5 text-gray-700" />
+                                <Minus className="w-4 h-4 text-gray-700" />
                             </button>
 
                             <input
@@ -44,7 +50,7 @@ const MetronomeWidget = () => {
                                 onClick={() => handleBpmChange(5)}
                                 className="p-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
                             >
-                                <Plus className="w-5 h-5 text-gray-700" />
+                                <Plus className="w-4 h-4 text-gray-700" />
                             </button>
                         </div>
 
@@ -65,7 +71,7 @@ const MetronomeWidget = () => {
                         {/* Play/Pause Button */}
                         <button
                             onClick={toggle}
-                            className={`w-full py-3 rounded-lg font-semibold transition-all ${
+                            className={`w-full py-2 rounded-lg font-semibold transition-all text-sm ${
                                 isPlaying
                                     ? 'bg-red-500 hover:bg-red-600 text-white'
                                     : 'bg-teal-500 hover:bg-teal-600 text-white'
@@ -74,12 +80,12 @@ const MetronomeWidget = () => {
                             <div className="flex items-center justify-center gap-2">
                                 {isPlaying ? (
                                     <>
-                                        <Pause className="w-5 h-5" />
+                                        <Pause className="w-4 h-4" />
                                         Stop
                                     </>
                                 ) : (
                                     <>
-                                        <Play className="w-5 h-5" />
+                                        <Play className="w-4 h-4" />
                                         Start
                                     </>
                                 )}
@@ -88,32 +94,7 @@ const MetronomeWidget = () => {
                     </div>
                 </div>
             )}
-
-            {/* Collapsed/Toggle Button */}
-            <button
-                onClick={() => setIsExpanded(!isExpanded)}
-                className={`w-full bg-gradient-to-r from-teal-500 to-teal-600 hover:from-teal-600 hover:to-teal-700 text-white px-4 py-3 shadow-lg transition-all ${
-                    isExpanded ? 'rounded-b-2xl' : 'rounded-2xl'
-                }`}
-            >
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Music className="w-5 h-5" />
-                        <span className="font-semibold">Metronome</span>
-                        {isPlaying && !isExpanded && (
-                            <span className="text-xs bg-white/20 px-2 py-1 rounded">
-                                {bpm} BPM
-                            </span>
-                        )}
-                    </div>
-                    {isExpanded ? (
-                        <ChevronDown className="w-5 h-5" />
-                    ) : (
-                        <ChevronUp className="w-5 h-5" />
-                    )}
-                </div>
-            </button>
-        </div>
+        </>
     );
 };
 
