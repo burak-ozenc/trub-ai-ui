@@ -8,6 +8,7 @@ const useMetronome = () => {
     const audioContextRef = useRef(null);
     const nextNoteTimeRef = useRef(0);
     const schedulerIdRef = useRef(null);
+    const currentBpmRef = useRef(120); // Track current BPM
 
     // Initialize Audio Context
     useEffect(() => {
@@ -42,7 +43,7 @@ const useMetronome = () => {
         const context = audioContextRef.current;
         if (!context) return;
 
-        const secondsPerBeat = 60.0 / bpm;
+        const secondsPerBeat = 60.0 / currentBpmRef.current; // Use ref for latest BPM
 
         // Schedule while we're ahead of time
         while (nextNoteTimeRef.current < context.currentTime + 0.1) {
@@ -52,7 +53,7 @@ const useMetronome = () => {
             setBeatCount(prev => prev + 1);
             nextNoteTimeRef.current += secondsPerBeat;
         }
-    }, [bpm, beatCount, playTick]);
+    }, [beatCount, playTick]);
 
     // Scheduler function
     const scheduler = useCallback(() => {
@@ -96,7 +97,26 @@ const useMetronome = () => {
     const changeBpm = useCallback((newBpm) => {
         const clampedBpm = Math.max(40, Math.min(240, newBpm));
         setBpm(clampedBpm);
+        currentBpmRef.current = clampedBpm; // Update ref immediately
     }, []);
+
+    // Restart metronome when BPM changes while playing
+    useEffect(() => {
+        if (isPlaying && currentBpmRef.current !== bpm) {
+            // Stop current scheduler
+            if (schedulerIdRef.current) {
+                clearTimeout(schedulerIdRef.current);
+                schedulerIdRef.current = null;
+            }
+
+            // Restart with new BPM
+            const context = audioContextRef.current;
+            if (context) {
+                nextNoteTimeRef.current = context.currentTime;
+                scheduler();
+            }
+        }
+    }, [bpm, isPlaying, scheduler]);
 
     // Cleanup on unmount
     useEffect(() => {

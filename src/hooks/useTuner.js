@@ -2,11 +2,13 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 
 const useTuner = (skillLevel = 'intermediate') => {
     const [isActive, setIsActive] = useState(false);
-    const [note, setNote] = useState('A');  // Default A4
-    const [octave, setOctave] = useState(4);  // Default A4
-    const [frequency, setFrequency] = useState(440);  // Default 440Hz
-    const [cents, setCents] = useState(0);  // Default in tune
+    const [note, setNote] = useState('A');
+    const [octave, setOctave] = useState(4);
+    const [frequency, setFrequency] = useState(440);
+    const [cents, setCents] = useState(0);
     const [stability, setStability] = useState([]);
+    const [audioLevel, setAudioLevel] = useState(0);
+    const [isDetecting, setIsDetecting] = useState(false);
 
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
@@ -14,10 +16,13 @@ const useTuner = (skillLevel = 'intermediate') => {
     const animationFrameRef = useRef(null);
     const bufferRef = useRef(null);
 
-    // Note names
+    const smoothedFrequencyRef = useRef(440);
+    const smoothedCentsRef = useRef(0);
+    const lastUpdateTimeRef = useRef(0);
+    const lastNoteRef = useRef('A'); // Track last note for smoother transitions
+
     const noteStrings = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
-    // Tolerance zones based on skill level
     const toleranceZones = {
         beginner: 15,
         intermediate: 10,
@@ -26,7 +31,6 @@ const useTuner = (skillLevel = 'intermediate') => {
 
     const tolerance = toleranceZones[skillLevel] || 10;
 
-    // Convert frequency to note
     const frequencyToNote = useCallback((frequency) => {
         const noteNum = 12 * (Math.log(frequency / 440) / Math.log(2));
         const noteIndex = Math.round(noteNum) + 69;
@@ -38,12 +42,10 @@ const useTuner = (skillLevel = 'intermediate') => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    // Get target frequency for a note
     const getTargetFrequency = useCallback((noteIndex) => {
         return 440 * Math.pow(2, (noteIndex - 69) / 12);
     }, []);
 
-    // Autocorrelation pitch detection
     const autoCorrelate = useCallback((buffer, sampleRate) => {
         const SIZE = buffer.length;
         const MAX_SAMPLES = Math.floor(SIZE / 2);
@@ -51,17 +53,19 @@ const useTuner = (skillLevel = 'intermediate') => {
         let best_correlation = 0;
         let rms = 0;
 
-        // Calculate RMS (volume check)
         for (let i = 0; i < SIZE; i++) {
             const val = buffer[i];
             rms += val * val;
         }
         rms = Math.sqrt(rms / SIZE);
 
-        // Not enough signal
-        if (rms < 0.01) return -1;
+        setAudioLevel(Math.min(rms * 20, 1));
 
-        // Find best correlation
+        if (rms < 0.05) {
+            setIsDetecting(false);
+            return -1;
+        }
+
         let lastCorrelation = 1;
         for (let offset = 1; offset < MAX_SAMPLES; offset++) {
             let correlation = 0;
@@ -83,61 +87,104 @@ const useTuner = (skillLevel = 'intermediate') => {
             lastCorrelation = correlation;
         }
 
-        if (best_correlation > 0.01) {
+        if (best_correlation > 0.1) {
+            setIsDetecting(true);
             return sampleRate / best_offset;
         }
 
+        setIsDetecting(false);
         return -1;
     }, []);
 
-    // Update pitch detection
     const updatePitch = useCallback(() => {
         if (!analyserRef.current || !bufferRef.current) return;
 
+        const now = performance.now();
+
+        if (now - lastUpdateTimeRef.current < 33) {
+            animationFrameRef.current = requestAnimationFrame(updatePitch);
+            return;
+        }
+
+        lastUpdateTimeRef.current = now;
+
         analyserRef.current.getFloatTimeDomainData(bufferRef.current);
-        const frequency = autoCorrelate(bufferRef.current, audioContextRef.current.sampleRate);
+        const detectedFrequency = autoCorrelate(bufferRef.current, audioContextRef.current.sampleRate);
 
-        if (frequency > 0 && frequency < 2000) {
-            const noteData = frequencyToNote(frequency);
-            setNote(noteData.noteName);
-            setOctave(noteData.octave);
-            setFrequency(Math.round(frequency * 10) / 10);
-            setCents(noteData.cents);
+        if (detectedFrequency > 0 && detectedFrequency < 2000) {
+            const smoothingFactor = 0.15;
+            smoothedFrequencyRef.current =
+                smoothedFrequencyRef.current * (1 - smoothingFactor) +
+                detectedFrequency * smoothingFactor;
 
-            // Update stability history (last 5 seconds, ~150 samples at 30fps)
-            setStability(prev => {
-                const newHistory = [...prev, noteData.cents];
-                return newHistory.slice(-150);
-            });
+            const noteData = frequencyToNote(smoothedFrequencyRef.current);
+
+            smoothedCentsRef.current =
+                smoothedCentsRef.current * (1 - smoothingFactor) +
+                noteData.cents * smoothingFactor;
+
+            const freqDiff = Math.abs(frequency - smoothedFrequencyRef.current);
+            const centsDiff = Math.abs(cents - smoothedCentsRef.current);
+            const noteChanged = note !== noteData.noteName;
+
+            // Only update if significant change OR note actually changed
+            // More lenient for note changes to make transitions softer
+            if (freqDiff > 0.5 || centsDiff > 0.5 || (noteChanged && lastNoteRef.current !== noteData.noteName)) {
+                setNote(noteData.noteName);
+                setOctave(noteData.octave);
+                setFrequency(Math.round(smoothedFrequencyRef.current * 10) / 10);
+                setCents(Math.round(smoothedCentsRef.current));
+
+                lastNoteRef.current = noteData.noteName;
+
+                setStability(prev => {
+                    const newHistory = [...prev, Math.round(smoothedCentsRef.current)];
+                    return newHistory.slice(-150);
+                });
+            }
+        } else {
+            // When sound stops, gently transition back to A4
+            // Use slower smoothing to avoid jarring return
+            if (isDetecting) {
+                smoothedFrequencyRef.current = smoothedFrequencyRef.current * 0.95 + 440 * 0.05;
+                smoothedCentsRef.current = smoothedCentsRef.current * 0.9;
+            }
         }
 
         animationFrameRef.current = requestAnimationFrame(updatePitch);
-    }, [autoCorrelate, frequencyToNote]);
+    }, [autoCorrelate, frequencyToNote, frequency, cents, note, isDetecting]);
 
-    // Start tuner
     const start = useCallback(async () => {
         try {
-            // Initialize audio context
             if (!audioContextRef.current) {
                 audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
             }
 
-            // Get microphone access
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                    echoCancellation: false,
+                    noiseSuppression: false,
+                    autoGainControl: false
+                }
+            });
             streamRef.current = stream;
 
-            // Create analyser
             const analyser = audioContextRef.current.createAnalyser();
-            analyser.fftSize = 2048;
+            analyser.fftSize = 4096;
+            analyser.smoothingTimeConstant = 0.8;
             const bufferLength = analyser.fftSize;
             const buffer = new Float32Array(bufferLength);
 
             analyserRef.current = analyser;
             bufferRef.current = buffer;
 
-            // Connect stream to analyser
             const source = audioContextRef.current.createMediaStreamSource(stream);
             source.connect(analyser);
+
+            smoothedFrequencyRef.current = 440;
+            smoothedCentsRef.current = 0;
+            lastUpdateTimeRef.current = performance.now();
+            lastNoteRef.current = 'A';
 
             setIsActive(true);
             updatePitch();
@@ -147,7 +194,6 @@ const useTuner = (skillLevel = 'intermediate') => {
         }
     }, [updatePitch]);
 
-    // Stop tuner
     const stop = useCallback(() => {
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
@@ -158,14 +204,19 @@ const useTuner = (skillLevel = 'intermediate') => {
         }
 
         setIsActive(false);
-        setNote(null);
-        setOctave(null);
-        setFrequency(0);
+        setNote('A');
+        setOctave(4);
+        setFrequency(440);
         setCents(0);
         setStability([]);
+        setAudioLevel(0);
+        setIsDetecting(false);
+
+        smoothedFrequencyRef.current = 440;
+        smoothedCentsRef.current = 0;
+        lastNoteRef.current = 'A';
     }, []);
 
-    // Toggle tuner
     const toggle = useCallback(() => {
         if (isActive) {
             stop();
@@ -174,7 +225,6 @@ const useTuner = (skillLevel = 'intermediate') => {
         }
     }, [isActive, start, stop]);
 
-    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (animationFrameRef.current) {
@@ -186,18 +236,15 @@ const useTuner = (skillLevel = 'intermediate') => {
         };
     }, []);
 
-    // Determine if in tune
     const isInTune = Math.abs(cents) <= tolerance;
 
-    // Get status color
     const getStatusColor = () => {
-        if (!note) return 'gray';
+        if (!isDetecting) return 'gray';
         if (Math.abs(cents) <= tolerance) return 'green';
         if (Math.abs(cents) <= tolerance * 2) return 'yellow';
         return 'red';
     };
 
-    // Get target frequency for current note
     const targetFrequency = note && octave
         ? Math.round(getTargetFrequency(noteStrings.indexOf(note) + (octave + 1) * 12) * 10) / 10
         : null;
@@ -213,6 +260,8 @@ const useTuner = (skillLevel = 'intermediate') => {
         isInTune,
         statusColor: getStatusColor(),
         tolerance,
+        audioLevel,
+        isDetecting,
         start,
         stop,
         toggle

@@ -12,6 +12,7 @@ import AnalysisResults from './Analyzer/AnalysisResults';
 import RecordingHistory from './Analyzer/RecordingHistory';
 import MetronomeSidebar from './Analyzer/MetronomeSidebar';
 import ChatSidebar from './Analyzer/ChatSidebar';
+import Header from "./Common/Header";
 
 const TrumpetAnalyzer = () => {
     const navigate = useNavigate();
@@ -153,44 +154,7 @@ const TrumpetAnalyzer = () => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50">
             {/* Header */}
-            <div className="bg-white shadow-sm border-b-2 border-orange-100">
-                <div className="max-w-7xl mx-auto px-6 py-3">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gradient-to-br from-orange-500 to-orange-600 rounded-lg shadow-lg">
-                                <Music className="w-6 h-6 text-white" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-orange-500 bg-clip-text text-transparent">
-                                    Trumpet Analyzer
-                                </h1>
-                                <p className="text-xs text-gray-500">AI-powered coaching</p>
-                            </div>
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <div className="text-right mr-2">
-                                <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.username}</p>
-                                <p className="text-xs text-gray-500">{user?.email}</p>
-                            </div>
-                            <button
-                                onClick={() => navigate('/progress')}
-                                className="flex items-center gap-2 px-3 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg transition-colors text-sm font-medium"
-                            >
-                                <BarChart3 className="w-4 h-4" />
-                                Progress
-                            </button>
-                            <button
-                                onClick={() => navigate('/profile')}
-                                className="flex items-center gap-2 px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors text-sm font-medium"
-                            >
-                                <Settings className="w-4 h-4" />
-                                Settings
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <Header/>
 
             {/* Main Content with dynamic margins for sidebars */}
             <div className={`transition-all duration-300 ${

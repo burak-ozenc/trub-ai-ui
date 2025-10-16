@@ -36,3 +36,60 @@
     transform: rotate(360deg);
   }
 }
+
+
+/* Existing slow pulse */
+@keyframes pulse-slow {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.95;
+        transform: scale(1.01);
+    }
+}
+
+.animate-pulse-slow {
+    animation: pulse-slow 2s ease-in-out infinite;
+}
+
+/* NEW: Stronger pulses for better feedback */
+@keyframes pulse-strong {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.02);
+        box-shadow: 0 0 20px 5px rgba(251, 146, 60, 0.3);
+    }
+}
+
+.animate-pulse-strong {
+    animation: pulse-strong 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse-strong-slow {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.1);
+    }
+    50% {
+        opacity: 0.9;
+        transform: scale(1.02);
+        box-shadow: 0 0 20px 5px rgba(16, 185, 129, 0.3);
+    }
+}
+
+.animate-pulse-strong-slow {
+    animation: pulse-strong-slow 2.5s ease-in-out infinite;
+}
+
+/* Fix for border-6 (Tailwind doesn't have this by default) */
+.border-6 {
+    border-width: 6px;
+}

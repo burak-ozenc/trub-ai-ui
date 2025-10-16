@@ -11,15 +11,44 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
         cents,
         targetFrequency,
         statusColor,
+        isDetecting,
         toggle
     } = useTuner(skillLevel);
 
+    // Fixed border thickness (6px), only color changes
+    const getBorderColor = () => {
+        if (!isDetecting) {
+            return 'border-gray-300';
+        }
+
+        const absCents = Math.abs(cents);
+        if (absCents <= 10) {
+            return 'border-emerald-500'; // In tune - green
+        } else if (absCents <= 25) {
+            return 'border-amber-500'; // Close - yellow
+        } else {
+            return 'border-red-500'; // Off - red
+        }
+    };
+
+    // Stronger pulse animation when detecting
+    const getPulseAnimation = () => {
+        if (!isDetecting) return '';
+
+        const absCents = Math.abs(cents);
+        if (absCents <= 10) {
+            return 'animate-pulse-strong-slow'; // Slow but noticeable when in-tune
+        } else {
+            return 'animate-pulse-strong'; // Stronger pulse when off-pitch
+        }
+    };
+
     // Color classes based on status
     const colorClasses = {
-        green: 'border-emerald-500 bg-emerald-50',
-        yellow: 'border-amber-500 bg-amber-50',
-        red: 'border-red-500 bg-red-50',
-        gray: 'border-gray-300 bg-gray-50'
+        green: 'bg-emerald-50',
+        yellow: 'bg-amber-50',
+        red: 'bg-red-50',
+        gray: 'bg-gray-50'
     };
 
     const textColorClasses = {
@@ -29,14 +58,14 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
         gray: 'text-gray-500'
     };
 
-    // Calculate needle position (-50 to +50 cents)
-    const needlePosition = Math.max(-50, Math.min(50, cents));
-    const needlePercent = ((needlePosition + 50) / 100) * 100;
+    // Calculate needle position for ±30¢ range (narrower, more sensitive)
+    const needlePosition = Math.max(-30, Math.min(30, cents));
+    const needlePercent = ((needlePosition + 30) / 60) * 100;
 
     // Minimized view
     if (isMinimized) {
         return (
-            <div className="bg-white rounded-2xl shadow-xl border-4 border-orange-200 p-4">
+            <div className={`bg-white rounded-2xl shadow-xl border-6 ${getBorderColor()} p-4 transition-all duration-700 ease-in-out ${getPulseAnimation()}`}>
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <button
@@ -52,10 +81,10 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
 
                         {note ? (
                             <div className="flex items-center gap-3">
-                                <span className={`text-3xl font-bold ${textColorClasses[statusColor]}`}>
+                                <span className={`text-3xl font-bold transition-all duration-700 ${textColorClasses[statusColor]}`}>
                                     {note}{octave}
                                 </span>
-                                <span className={`text-lg ${textColorClasses[statusColor]}`}>
+                                <span className={`text-lg transition-all duration-700 ${textColorClasses[statusColor]}`}>
                                     {cents > 0 ? '+' : ''}{cents}¢
                                 </span>
                             </div>
@@ -79,14 +108,19 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
 
     // Full view
     return (
-        <div className={`bg-white rounded-3xl shadow-2xl border-4 transition-all ${
+        <div className={`bg-white rounded-3xl shadow-2xl border-6 ${getBorderColor()} ${
             colorClasses[statusColor]
-        } p-8`}>
+        } p-8 transition-all duration-700 ease-in-out ${getPulseAnimation()}`}>
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
-                    <Radio className={`w-7 h-7 ${textColorClasses[statusColor]}`} />
+                    <Radio className={`w-7 h-7 transition-colors duration-700 ${textColorClasses[statusColor]}`} />
                     <h2 className="text-2xl font-bold text-gray-800">Tuner</h2>
+                    {isDetecting && (
+                        <span className="px-3 py-1 bg-emerald-100 text-emerald-700 text-xs font-semibold rounded-full animate-pulse-strong-slow">
+                            DETECTING
+                        </span>
+                    )}
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -123,15 +157,15 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
                 </div>
             </div>
 
-            {/* Main Display - Always show note (A4 when inactive) */}
+            {/* Main Display */}
             <div className="mb-6">
                 {/* Note Display */}
                 <div className="text-center mb-6">
-                    <div className={`text-8xl font-bold mb-2 ${textColorClasses[statusColor]}`}>
+                    <div className={`text-8xl font-bold mb-2 transition-all duration-700 ${textColorClasses[statusColor]}`}>
                         {note}
                         <span className="text-5xl">{octave}</span>
                     </div>
-                    <div className={`text-3xl font-semibold ${textColorClasses[statusColor]}`}>
+                    <div className={`text-3xl font-semibold transition-all duration-700 ${textColorClasses[statusColor]}`}>
                         {cents > 0 ? '+' : ''}{cents} cents
                     </div>
                     {!isActive && (
@@ -139,33 +173,33 @@ const TunerWidget = ({ skillLevel = 'intermediate', isMinimized, onToggleMinimiz
                     )}
                 </div>
 
-                {/* Visual Meter */}
+                {/* Visual Meter - Narrower range (±30¢) */}
                 <div className="relative h-24 bg-gray-100 rounded-2xl mb-6 overflow-hidden">
                     {/* Color zones */}
                     <div className="absolute inset-0 flex">
                         <div className="flex-1 bg-gradient-to-r from-red-200 to-yellow-200"></div>
-                        <div className="w-1/5 bg-gradient-to-r from-yellow-200 via-emerald-200 to-yellow-200"></div>
+                        <div className="w-1/3 bg-gradient-to-r from-yellow-200 via-emerald-200 to-yellow-200"></div>
                         <div className="flex-1 bg-gradient-to-r from-yellow-200 to-red-200"></div>
                     </div>
 
                     {/* Center line */}
                     <div className="absolute left-1/2 top-0 bottom-0 w-1 bg-gray-800 transform -translate-x-1/2"></div>
 
-                    {/* Needle - Smooth transition */}
+                    {/* Needle - Smoother, slower transition */}
                     <div
-                        className="absolute top-0 bottom-0 w-2 bg-gray-900 rounded-full transform -translate-x-1/2 transition-all duration-200 ease-out"
+                        className="absolute top-0 bottom-0 w-2 bg-gray-900 rounded-full transform -translate-x-1/2 transition-all duration-700 ease-in-out"
                         style={{ left: `${needlePercent}%` }}
                     >
                         <div className="absolute -top-2 left-1/2 transform -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-gray-900"></div>
                     </div>
 
-                    {/* Scale markers */}
+                    {/* Scale markers - Updated for ±30¢ */}
                     <div className="absolute inset-x-0 bottom-2 flex justify-between px-4 text-xs text-gray-600 font-medium">
-                        <span>-50¢</span>
-                        <span>-25¢</span>
+                        <span>-30¢</span>
+                        <span>-15¢</span>
                         <span className="font-bold">0</span>
-                        <span>+25¢</span>
-                        <span>+50¢</span>
+                        <span>+15¢</span>
+                        <span>+30¢</span>
                     </div>
                 </div>
 
