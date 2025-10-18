@@ -246,6 +246,98 @@ class ApiClient {
         return this.handleResponse(response);
     }
 
+    // Calendar endpoints
+    async createCalendarEntry(entryData) {
+        const response = await fetch(`${this.baseURL}/calendar/entries`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(entryData),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getCalendarEntries(startDate, endDate) {
+        const start = startDate.toISOString();
+        const end = endDate.toISOString();
+        const response = await fetch(
+            `${this.baseURL}/calendar/entries?start_date=${start}&end_date=${end}`,
+            {
+                headers: this.getHeaders(true),
+            }
+        );
+        return this.handleResponse(response);
+    }
+
+    async getEntriesByDate(date) {
+        console.log(date)
+        // Format: YYYY-MM-DD in local timezone
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        const dateStr = `${year}-${month}-${day}`;
+        console.log(dateStr)
+        const response = await fetch(`${this.baseURL}/calendar/entries/date/${dateStr}`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getUpcomingPractices(limit = 10) {
+        const response = await fetch(`${this.baseURL}/calendar/entries/upcoming?limit=${limit}`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async updateCalendarEntry(entryId, updateData) {
+        const response = await fetch(`${this.baseURL}/calendar/entries/${entryId}`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(updateData),
+        });
+        return this.handleResponse(response);
+    }
+
+    async completeCalendarEntry(entryId, practiceSessionId = null) {
+        console.log(practiceSessionId)
+        const response = await fetch(
+            `${this.baseURL}/calendar/entries/${entryId}/complete?practice_session_id=${parseInt(practiceSessionId) || 0}`,
+            {
+                method: 'POST',
+                headers: this.getHeaders(true),
+            }
+        );
+        return this.handleResponse(response);
+    }
+
+    async deleteCalendarEntry(entryId) {
+        const response = await fetch(`${this.baseURL}/calendar/entries/${entryId}`, {
+            method: 'DELETE',
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    // Link practice session to calendar
+    async startPracticeFromCalendar(calendarEntryId) {
+        const response = await fetch(`${this.baseURL}/practice/sessions/from-calendar/${calendarEntryId}`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async completePracticeWithCalendar(sessionId, calendarEntryId, data) {
+        const response = await fetch(
+            `${this.baseURL}/practice/sessions/${sessionId}/complete?calendar_entry_id=${calendarEntryId}`,
+            {
+                method: 'PUT',
+                headers: this.getHeaders(true),
+                body: JSON.stringify(data),
+            }
+        );
+        return this.handleResponse(response);
+    }
 }
 
 export const api = new ApiClient(process.env.REACT_APP_BACKEND_URL);
