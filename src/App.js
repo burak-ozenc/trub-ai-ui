@@ -9,6 +9,8 @@ import Register from './components/Auth/Register';
 import TrumpetAnalyzer from './components/TrumpetAnalyzer';
 import ProfileSettings from './components/Profile/ProfileSettings';
 import ProgressDashboard from './components/Progress/ProgressDashboard';
+import PracticePage from './Pages/PracticePage';
+import CalendarPage from './Pages/CalendarPage';
 
 function App() {
     return (

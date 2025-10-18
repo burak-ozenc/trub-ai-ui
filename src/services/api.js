@@ -183,6 +183,69 @@ class ApiClient {
         });
         return this.handleResponse(response);
     }
+    
+    // Exercise endpoints
+    async getExercises(technique = null, difficulty = null) {
+        let url = `${this.baseURL}/exercises/?skip=0&limit=50`;
+        if (technique) url += `&technique=${technique}`;
+        if (difficulty) url += `&difficulty=${difficulty}`;
+
+        const response = await fetch(url, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getRecommendedExercises(technique = null) {
+        let url = `${this.baseURL}/exercises/recommended`;
+        if (technique) url += `?technique=${technique}`;
+
+        const response = await fetch(url, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getExercise(exerciseId) {
+        const response = await fetch(`${this.baseURL}/exercises/${exerciseId}`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    // Practice session endpoints
+    async startPracticeSession(exerciseId) {
+        const response = await fetch(`${this.baseURL}/practice/sessions`, {
+            method: 'POST',
+            headers: this.getHeaders(true),
+            body: JSON.stringify({ exercise_id: exerciseId }),
+        });
+        return this.handleResponse(response);
+    }
+
+    async completePracticeSession(sessionId, data) {
+        const response = await fetch(`${this.baseURL}/practice/sessions/${sessionId}/complete`, {
+            method: 'PUT',
+            headers: this.getHeaders(true),
+            body: JSON.stringify(data),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getPracticeSessions(skip = 0, limit = 50) {
+        const response = await fetch(`${this.baseURL}/practice/sessions?skip=${skip}&limit=${limit}`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
+    async getSessionFeedback(sessionId) {
+        const response = await fetch(`${this.baseURL}/practice/sessions/${sessionId}/feedback`, {
+            headers: this.getHeaders(true),
+        });
+        return this.handleResponse(response);
+    }
+
 }
 
 export const api = new ApiClient(process.env.REACT_APP_BACKEND_URL);

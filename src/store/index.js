@@ -1,6 +1,8 @@
 import { configureStore } from '@reduxjs/toolkit';
 import recordingsReducer from './slices/recordingsSlice';
 import settingsReducer from './slices/settingsSlice';
+import exercisesReducer from './slices/exercisesSlice';
+import practiceReducer from './slices/practiceSlice';
 
 // Load persisted state from localStorage
 const loadState = () => {
@@ -46,6 +48,8 @@ export const store = configureStore({
         // Future slices:
         // chat: chatReducer,
         // analysis: analysisReducer,
+        exercises: exercisesReducer,
+        practice: practiceReducer,
     },
     preloadedState,
     middleware: (getDefaultMiddleware) =>

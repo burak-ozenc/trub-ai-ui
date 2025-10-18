@@ -8,7 +8,7 @@ const initialState = {
     playingId: null,
     loading: false,
     error: null,
-    hasFetched: false  // NEW - Track if we've fetched
+    hasFetched: false  // Track if we've fetched
 };
 
 // Async thunks for API calls
