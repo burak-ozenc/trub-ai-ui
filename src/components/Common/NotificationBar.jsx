@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+﻿import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
@@ -87,10 +87,6 @@ const Header = () => {
                             </div>
                         </button>
 
-                    <div className="flex items-center gap-2">
-                        <div className="text-right mr-2">
-                            <p className="text-sm font-medium text-gray-900">{user?.full_name || user?.username}</p>
-                            <p className="text-xs text-gray-500">{user?.email}</p>
                         {/* Navigation */}
                         <div className="flex items-center gap-2">
                             <button
@@ -109,6 +105,18 @@ const Header = () => {
                                 <span className="hidden md:inline">Practice</span>
                             </button>
 
+                            <button
+                                onClick={() => navigate('/calendar')}
+                                className={`${navButtonClass('/calendar')} relative`}
+                            >
+                                <Calendar className="w-5 h-5" />
+                                <span className="hidden md:inline">Calendar</span>
+                                {todaysPractices.length > 0 && (
+                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold">
+                                        {todaysPractices.length}
+                                    </span>
+                                )}
+                            </button>
 
                             <button
                                 onClick={() => navigate('/progress')}

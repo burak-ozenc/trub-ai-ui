@@ -32,6 +32,14 @@ function App() {
                             }
                         />
                         <Route
+                            path="/practice"
+                            element={
+                                <ProtectedRoute>
+                                    <PracticePage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
                             path="/profile"
                             element={
                                 <ProtectedRoute>
