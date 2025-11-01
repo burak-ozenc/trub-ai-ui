@@ -9,6 +9,13 @@ export const startSession = createAsyncThunk(
     }
 );
 
+export const startSessionFromCalendar = createAsyncThunk(
+    'practice/startSessionFromCalendar',
+    async (calendarEntryId) => {
+        return await api.startPracticeFromCalendar(calendarEntryId);
+    }
+);
+
 export const completeSession = createAsyncThunk(
     'practice/completeSession',
     async ({ sessionId, data }) => {
@@ -38,6 +45,7 @@ const practiceSlice = createSlice({
         currentFeedback: null,
         isSessionActive: false,
         sessionStartTime: null,
+        calendarEntryId: null,  // NEW: Track linked calendar entry
         loading: false,
         error: null,
     },
@@ -45,11 +53,15 @@ const practiceSlice = createSlice({
         setSessionStartTime: (state, action) => {
             state.sessionStartTime = action.payload;
         },
+        setCalendarEntryId: (state, action) => {  // NEW
+            state.calendarEntryId = action.payload;
+        },
         clearCurrentSession: (state) => {
             state.currentSession = null;
             state.isSessionActive = false;
             state.sessionStartTime = null;
             state.currentFeedback = null;
+            state.calendarEntryId = null;  // NEW
         },
     },
     extraReducers: (builder) => {
@@ -68,6 +80,23 @@ const practiceSlice = createSlice({
             .addCase(startSession.rejected, (state, action) => {
                 state.loading = false;
                 state.error = action.error.message;
+                state.isSessionActive = false;
+            })
+            // Start session from calendar
+            .addCase(startSessionFromCalendar.pending, (state) => {
+                state.loading = true;
+                state.error = null;
+            })
+            .addCase(startSessionFromCalendar.fulfilled, (state, action) => {
+                state.loading = false;
+                state.currentSession = action.payload;
+                state.isSessionActive = true;
+                state.sessionStartTime = Date.now();
+            })
+            .addCase(startSessionFromCalendar.rejected, (state, action) => {
+                state.loading = false;
+                state.error = action.error.message;
+                state.isSessionActive = false;
             })
             // Complete session
             .addCase(completeSession.pending, (state) => {
@@ -101,5 +130,5 @@ const practiceSlice = createSlice({
     },
 });
 
-export const { setSessionStartTime, clearCurrentSession } = practiceSlice.actions;
+export const { setSessionStartTime, setCalendarEntryId, clearCurrentSession } = practiceSlice.actions;
 export default practiceSlice.reducer;

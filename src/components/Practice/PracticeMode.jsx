@@ -1,6 +1,12 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { startSession, completeSession, clearCurrentSession } from '../../store/slices/practiceSlice';
+import {
+    startSession,
+    startSessionFromCalendar,
+    completeSession,
+    clearCurrentSession,
+    setCalendarEntryId
+} from '../../store/slices/practiceSlice';
 import { saveRecordingToDb } from '../../store/slices/recordingsSlice';
 import { completeEntry } from '../../store/slices/calendarSlice';
 import { api } from '../../services/api';
@@ -15,11 +21,11 @@ import {useAuth} from "../../context/AuthContext";
 
 const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
     const dispatch = useAppDispatch();
-    const { user } = useAuth();
     const { currentSession, isSessionActive, sessionStartTime } = useAppSelector(
         (state) => state.practice
     );
-    
+    // const { user } = useAppSelector((state) => state.auth);
+    const { user } = useAuth();
 
     // Recording state
     const [isRecording, setIsRecording] = useState(false);
@@ -27,6 +33,7 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
     const [hasRecorded, setHasRecorded] = useState(false);
     const [error, setError] = useState('');
     const [analysisResult, setAnalysisResult] = useState(null);
+    const [recordingId, setRecordingId] = useState(null);  // NEW: Track recording ID
 
     // UI State
     const [tunerMinimized, setTunerMinimized] = useState(false);
@@ -34,27 +41,38 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
     // Refs
     const mediaRecorder = useRef(null);
     const audioChunks = useRef([]);
+    const sessionInitialized = useRef(false);  // NEW: Prevent double initialization
 
     // Start practice session when component mounts
     useEffect(() => {
-        if (!isSessionActive && exercise) {
-            if (calendarEntryId) {
-                // Start from calendar entry
-                api.startPracticeFromCalendar(calendarEntryId)
-                    .then(session => {
-                        // Session started and linked to calendar
-                        console.log('Practice session started from calendar:', session);
-                    })
-                    .catch(err => {
-                        console.error('Error starting from calendar:', err);
-                        // Fallback to regular session
-                        dispatch(startSession(exercise.id));
-                    });
-            } else {
-                // Regular practice session
-                dispatch(startSession(exercise.id));
+        const initializeSession = async () => {
+            if (sessionInitialized.current) return;  // Prevent duplicate calls
+            sessionInitialized.current = true;
+
+            if (!exercise) {
+                setError('No exercise provided');
+                return;
             }
-        }
+
+            try {
+                if (calendarEntryId) {
+                    // Start from calendar entry
+                    console.log('Starting session from calendar entry:', calendarEntryId);
+                    await dispatch(startSessionFromCalendar(calendarEntryId)).unwrap();
+                    dispatch(setCalendarEntryId(calendarEntryId));
+                } else {
+                    // Regular practice session
+                    console.log('Starting regular session for exercise:', exercise.id);
+                    await dispatch(startSession(exercise.id)).unwrap();
+                }
+                console.log('Session started successfully');
+            } catch (err) {
+                console.error('Error starting session:', err);
+                setError('Failed to start practice session: ' + err.message);
+            }
+        };
+
+        initializeSession();
 
         return () => {
             // Cleanup: if leaving without completing, complete the session
@@ -66,10 +84,15 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                 }));
             }
         };
-    }, []);
+    }, []); // Empty deps - only run once
 
     // Recording functions
     const startRecording = async () => {
+        if (!isSessionActive) {
+            setError('Practice session is not active. Please wait...');
+            return;
+        }
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             mediaRecorder.current = new MediaRecorder(stream);
@@ -113,9 +136,8 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
 
             // Check if simplified_feedback exists in response
             if (data.simplified_feedback) {
-                setAnalysisResult(data); // Use backend simplified feedback directly
+                setAnalysisResult(data);
             } else {
-                // Fallback if backend doesn't return simplified feedback (shouldn't happen)
                 console.warn('No simplified feedback from backend');
                 setAnalysisResult(data);
             }
@@ -133,10 +155,16 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                 audio_file_path: data.file_path || null
             };
 
-            await dispatch(saveRecordingToDb({
+            const savedRecording = await dispatch(saveRecordingToDb({
                 ...recordingData,
                 tempId: Date.now().toString()
             })).unwrap();
+
+            // Store the recording ID for completion
+            if (savedRecording && savedRecording.id) {
+                setRecordingId(savedRecording.id);
+                console.log('Recording saved with ID:', savedRecording.id);
+            }
 
         } catch (err) {
             setError('Error analyzing audio: ' + err.message);
@@ -146,56 +174,25 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
     };
 
     const completeWithRecording = async () => {
-        if (!currentSession || !analysisResult) return;
+        if (!currentSession) {
+            setError('No active session to complete');
+            return;
+        }
+
+        if (!recordingId) {
+            setError('No recording found');
+            return;
+        }
 
         const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
 
         try {
-            // Complete practice session
             const completionData = {
                 duration_seconds: duration,
-                recording_id: analysisResult.recording_id || null
+                recording_id: recordingId  // Use the stored recording ID
             };
 
-            // If linked to calendar, pass the calendar_entry_id
-            if (calendarEntryId) {
-                await api.completePracticeWithCalendar(
-                    currentSession.id,
-                    calendarEntryId,
-                    completionData
-                );
-
-                // Also mark calendar entry as complete in Redux
-                await dispatch(completeEntry({
-                    entryId: calendarEntryId,
-                    practiceSessionId: currentSession.id
-                }));
-            } else {
-                // Regular completion
-                await dispatch(completeSession({
-                    sessionId: currentSession.id,
-                    data: completionData
-                }));
-            }
-
-            // Show success and go back after delay
-            setTimeout(() => {
-                dispatch(clearCurrentSession());
-                onBack();
-            }, 2000);
-        } catch (error) {
-            console.error('Error completing practice:', error);
-            setError('Failed to complete practice session');
-        }
-    };
-
-    const completeWithoutRecording = async () => {
-        if (!currentSession) return;
-
-        const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
-
-        try {
-            const completionData = { duration_seconds: duration };
+            console.log('Completing session:', currentSession.id, 'with data:', completionData);
 
             // If linked to calendar, pass the calendar_entry_id
             if (calendarEntryId) {
@@ -215,16 +212,79 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                 await dispatch(completeSession({
                     sessionId: currentSession.id,
                     data: completionData
-                }));
+                })).unwrap();
             }
+
+            console.log('Session completed successfully');
+
+            // Show success and go back after delay
+            setTimeout(() => {
+                dispatch(clearCurrentSession());
+                onBack();
+            }, 2000);
+        } catch (error) {
+            console.error('Error completing practice:', error);
+            setError('Failed to complete practice session: ' + error.message);
+        }
+    };
+
+    const completeWithoutRecording = async () => {
+        if (!currentSession) {
+            setError('No active session to complete');
+            return;
+        }
+
+        const duration = Math.floor((Date.now() - sessionStartTime) / 1000);
+
+        try {
+            const completionData = {
+                duration_seconds: duration,
+                recording_id: null
+            };
+
+            console.log('Completing session without recording:', currentSession.id);
+
+            // If linked to calendar, pass the calendar_entry_id
+            if (calendarEntryId) {
+                await api.completePracticeWithCalendar(
+                    currentSession.id,
+                    calendarEntryId,
+                    completionData
+                );
+
+                // Mark calendar entry as complete
+                await dispatch(completeEntry({
+                    entryId: calendarEntryId,
+                    practiceSessionId: currentSession.id
+                }));
+            } else {
+                // Regular completion
+                await dispatch(completeSession({
+                    sessionId: currentSession.id,
+                    data: completionData
+                })).unwrap();
+            }
+
+            console.log('Session completed without recording');
 
             dispatch(clearCurrentSession());
             onBack();
         } catch (error) {
             console.error('Error completing practice:', error);
-            setError('Failed to complete practice session');
+            setError('Failed to complete practice session: ' + error.message);
         }
     };
+
+    // Debug logging
+    useEffect(() => {
+        console.log('Session State:', {
+            currentSession,
+            isSessionActive,
+            sessionStartTime,
+            calendarEntryId,
+            exerciseId: exercise?.id
+        });
+    }, [currentSession, isSessionActive, sessionStartTime, calendarEntryId, exercise]);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50 p-6">
@@ -243,6 +303,17 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                     <div className="mb-4 bg-teal-50 border-2 border-teal-300 rounded-xl p-4">
                         <p className="text-teal-800 font-medium">
                             📅 This practice is linked to your calendar schedule
+                        </p>
+                    </div>
+                )}
+
+                {/* Session Status Debug Info - Remove in production */}
+                {process.env.NODE_ENV === 'development' && (
+                    <div className="mb-4 bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+                        <p className="text-blue-800 text-sm">
+                            <strong>Debug:</strong> Session Active: {isSessionActive ? 'Yes' : 'No'} |
+                            Session ID: {currentSession?.id || 'None'} |
+                            Recording ID: {recordingId || 'None'}
                         </p>
                     </div>
                 )}
@@ -309,7 +380,12 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                                 {/* Complete Button */}
                                 <button
                                     onClick={completeWithRecording}
-                                    className="w-full mt-6 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-6 py-4 rounded-xl font-semibold shadow-lg transition-all"
+                                    disabled={!recordingId}
+                                    className={`w-full mt-6 px-6 py-4 rounded-xl font-semibold shadow-lg transition-all ${
+                                        recordingId
+                                            ? 'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white'
+                                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                    }`}
                                 >
                                     Complete Practice Session ✓
                                 </button>
@@ -319,7 +395,9 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                         {!analysisResult && !isAnalyzing && (
                             <div className="bg-gray-50 rounded-xl p-8 border-2 border-dashed border-gray-300 text-center">
                                 <p className="text-gray-500">
-                                    Record your practice to get instant feedback!
+                                    {isSessionActive
+                                        ? 'Record your practice to get instant feedback!'
+                                        : 'Starting practice session...'}
                                 </p>
                             </div>
                         )}
