@@ -4,6 +4,7 @@ import settingsReducer from './slices/settingsSlice';
 import exercisesReducer from './slices/exercisesSlice';
 import practiceReducer from './slices/practiceSlice';
 import calendarReducer from './slices/calendarSlice';
+import playbackReducer from './slices/playbackSlice'; 
 
 // Load persisted state from localStorage
 const loadState = () => {
@@ -48,7 +49,8 @@ export const store = configureStore({
         settings: settingsReducer,
         exercises: exercisesReducer,
         practice: practiceReducer,
-        calendar: calendarReducer, 
+        calendar: calendarReducer,
+        playback: playbackReducer,
     },
     preloadedState,
     middleware: (getDefaultMiddleware) =>
