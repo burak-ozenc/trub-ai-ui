@@ -6,7 +6,9 @@ import store from './store';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import Login from './components/Auth/Login';
 import Register from './components/Auth/Register';
-import TrumpetAnalyzer from './components/TrumpetAnalyzer';
+import HomePage from './Pages/HomePage';
+import SongLibraryPage from './Pages/SongLibraryPage';
+import PlayAlongPage from './Pages/PlayAlongPage';
 import ProfileSettings from './components/Profile/ProfileSettings';
 import ProgressDashboard from './components/Progress/ProgressDashboard';
 import PracticePage from './Pages/PracticePage';
@@ -27,7 +29,23 @@ function App() {
                             path="/"
                             element={
                                 <ProtectedRoute>
-                                    <TrumpetAnalyzer />
+                                    <HomePage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/songs"
+                            element={
+                                <ProtectedRoute>
+                                    <SongLibraryPage />
+                                </ProtectedRoute>
+                            }
+                        />
+                        <Route
+                            path="/play-along/:songId/:difficulty"
+                            element={
+                                <ProtectedRoute>
+                                    <PlayAlongPage />
                                 </ProtectedRoute>
                             }
                         />

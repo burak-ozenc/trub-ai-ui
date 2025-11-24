@@ -338,6 +338,122 @@ class ApiClient {
         );
         return this.handleResponse(response);
     }
+
+    // Song endpoints
+    async getSongs(filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.genre) params.append('genre', filters.genre);
+        if (filters.skip !== undefined) params.append('skip', filters.skip);
+        if (filters.limit !== undefined) params.append('limit', filters.limit);
+
+        const response = await fetch(
+            `${this.baseURL}/songs/library?${params.toString()}`,
+            { headers: this.getHeaders(true) }
+        );
+        return this.handleResponse(response);
+    }
+
+    async getSongDetails(songId) {
+        const response = await fetch(
+            `${this.baseURL}/songs/${songId}`,
+            { headers: this.getHeaders(true) }
+        );
+        return this.handleResponse(response);
+    }
+
+    async getSongSheetMusic(songId, difficulty) {
+        const token = authUtils.getToken();
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(
+            `${this.baseURL}/songs/${songId}/sheet-music/${difficulty}`,
+            { headers: this.getHeaders(true) }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to load sheet music');
+        }
+        return response.blob();
+    }
+
+    async getSongBackingTrack(songId) {
+        const token = authUtils.getToken();
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(
+            `${this.baseURL}/songs/${songId}/backing-track`,
+            { headers }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to load backing track');
+        }
+        return response.blob();
+    }
+
+    async getSongMidi(songId, difficulty) {
+        const token = authUtils.getToken();
+        const headers = {};
+        if (token) {
+            headers['Authorization'] = `Bearer ${token}`;
+        }
+
+        const response = await fetch(
+            `${this.baseURL}/songs/${songId}/midi/${difficulty}`,
+            { headers: this.getHeaders(true) }
+        );
+
+        if (!response.ok) {
+            throw new Error('Failed to load MIDI file');
+        }
+        return response.blob();
+    }
+
+// Play-along session endpoints
+    async startPlayAlongSession(songId, difficulty) {
+        const response = await fetch(
+            `${this.baseURL}/play-along/start`,
+            {
+                method: 'POST',
+                headers: this.getHeaders(true),
+                body: JSON.stringify({ song_id: songId, difficulty })
+            }
+        );
+        return this.handleResponse(response);
+    }
+
+    async submitPerformance(sessionId, performanceData) {
+        const response = await fetch(
+            `${this.baseURL}/play-along/submit-performance`,
+            {
+                method: 'POST',
+                headers: this.getHeaders(true),
+                body: JSON.stringify({
+                    session_id: sessionId,
+                    ...performanceData
+                })
+            }
+        );
+        return this.handleResponse(response);
+    }
+
+    async getPlayAlongSessions(filters = {}) {
+        const params = new URLSearchParams();
+        if (filters.skip !== undefined) params.append('skip', filters.skip);
+        if (filters.limit !== undefined) params.append('limit', filters.limit);
+
+        const response = await fetch(
+            `${this.baseURL}/play-along/sessions?${params.toString()}`,
+            { headers: this.getHeaders(true) }
+        );
+        return this.handleResponse(response);
+    }
 }
 
 export const api = new ApiClient(process.env.REACT_APP_BACKEND_URL);
