@@ -1,26 +1,36 @@
 # 🎺 Trub AI Frontend
 
-Modern web interface for AI-powered trumpet performance analysis with real-time tuner and intelligent feedback.
+Modern web interface for AI-powered trumpet performance analysis with real-time tuner, intelligent feedback, and interactive play-along.
 
 ## Features
 
 ### Practice Tools
-- **Real-Time Tuner**: Center-stage pitch detection with visual feedback, shows note name, octave, frequency, and cents deviation
-- **Metronome**: BPM control (40-240) with visual beat indicator, collapsible widget
-- **Recording**: One-click recording with required guidance prompts
-- **Audio Playback**: Review past performances with play/pause controls
+- **Real-Time Tuner**: Pitch detection with visual feedback (note, frequency, cents deviation)
+- **Metronome**: BPM control (40-240) with visual beat indicator
+- **Recording**: One-click recording with guidance prompts
+- **Audio Playback**: Review past performances
+
+### Play-Along Feature (NEW)
+- **Interactive Sheet Music**: Real-time note highlighting with VexFlow
+- **30 Public Domain Songs**: Classical, folk, and Christmas music
+- **3 Difficulty Levels**: Beginner, intermediate, and advanced per song
+- **Live Feedback**: Color-coded note validation (correct/close/wrong)
+- **Practice Modes**: 
+  - **Wait Mode**: Pauses until correct note is played
+  - **Flow Mode**: Continuous play with real-time scoring
+- **Performance Tracking**: Pitch accuracy, duration accuracy, overall score
 
 ### AI Teacher
-- **LLM Chat**: Ask questions and get personalized feedback in left sidebar
-- **Analysis**: 5-dimension performance evaluation (breath control, tone quality, rhythm/timing, musical expression, note flexibility)
-- **Recommendations**: AI-generated practice tips based on analysis
-- **Progress Tracking**: Line charts showing improvement trends over time
+- **LLM Chat**: Ask questions and get personalized feedback
+- **5-Dimension Analysis**: Breath control, tone quality, rhythm/timing, expression, flexibility
+- **AI Recommendations**: Practice tips based on analysis
+- **Progress Tracking**: Charts showing improvement trends
 
 ### User Management
 - JWT authentication with secure token storage
-- User profiles with skill levels (Beginner/Intermediate/Advanced)
-- Recording history with metadata and audio files
-- Settings management (LLM model selection, audio quality preferences)
+- User profiles with skill levels
+- Recording and session history
+- Settings management
 
 ## Prerequisites
 
@@ -30,11 +40,9 @@ Modern web interface for AI-powered trumpet performance analysis with real-time 
 
 ## Quick Start
 
-### 1. Install Node.js (if not installed)
+### 1. Install Node.js
 
-**Windows:**
-- Download from nodejs.org
-- Run installer (includes npm)
+**Windows:** Download from nodejs.org
 
 **Linux (Ubuntu/Debian):**
 ```bash
@@ -58,35 +66,20 @@ cd trub-ai-ui
 npm install
 ```
 
-This installs all required packages including:
+Key packages:
 - React 18+
-- Redux Toolkit for state management
-- React Router for navigation
-- Tailwind CSS for styling
-- Recharts for progress visualization
-- Lucide React for icons
+- Redux Toolkit
+- React Router
+- Tailwind CSS
+- VexFlow (sheet music rendering)
+- @tonejs/midi (MIDI parsing)
+- Recharts (progress visualization)
 
 ### 4. Configure Environment
 
-Create .env file:
+Create `.env` file:
 ```bash
-cp .env.example .env
-```
-
-Edit .env file:
-
-Windows: 
-```bash
-notepad .env
-```
-Linux/macOS: 
-```bash
-nano .env
-```
-
-Set backend API URL:
-```bash
-REACT_APP_API_URL=http://localhost:8000
+REACT_APP_BACKEND_URL=http://localhost:8000
 ```
 
 ### 5. Run Application
@@ -94,154 +87,138 @@ REACT_APP_API_URL=http://localhost:8000
 npm start
 ```
 
-Application will be available at: http://localhost:3000
+Application available at: http://localhost:3000
 
 ## UI Features
 
 ### Layout Structure
 
-**Left Sidebar (576px):**
+**Left Sidebar:**
 - AI Teacher chat interface
 - Message history
 - Question input
-- Collapsible toggle
 
 **Center Area:**
-- Hero tuner widget (always visible)
-- Recording guidance prompt with quick chips
-- Record button (132px, orange gradient)
-- Analysis results (collapsible)
-- Technical metrics display
+- Tuner widget (always visible)
+- Recording controls
+- Analysis results
+- **Play-along interface (NEW)**
 
 **Right Sidebar:**
-- Recording History (top section)
-- Metronome (bottom section)
+- Recording History
+- Metronome
 
-### Color Theme (Energy - Orange/Teal)
+### Color Theme
 
-Primary: #FF5500 (Vibrant Orange)
-Secondary: #14b8a6 (Teal)
-Success: #10b981 (Emerald Green)
-Warning: #f59e0b (Amber)
-Error: #ef4444 (Red)
-Background: Soft peachy gradient
+- Primary: #FF5500 (Orange)
+- Secondary: #14b8a6 (Teal)
+- Success: #10b981 (Green)
+- Warning: #f59e0b (Yellow)
+- Error: #ef4444 (Red)
 
-### Audio Features
+### Play-Along Interface (NEW)
 
-**Tuner:**
-- Pitch detection using autocorrelation algorithm
-- Accuracy: ±1 cent
-- Smoothing: Exponential moving average
-- Default display: A4 (440Hz) when inactive
-- Shows note name, octave, frequency, cents deviation
-- Color zones: Green (in tune), Yellow (slightly off), Red (way off)
+**Sheet Music Renderer:**
+- VexFlow-based notation display
+- Real-time note highlighting (orange for current note)
+- Color-coded feedback:
+  - Green: Correct pitch and duration
+  - Yellow: Close (within tolerance)
+  - Red: Wrong note or off-pitch
+  - Gray: Silent/no sound detected
 
-**Metronome:**
-- Web Audio API for precise timing
-- BPM range: 40-240
-- Visual beat indicators
-- Continues running when collapsed
+**Practice Controls:**
+- Play/Pause audio playback
+- Tempo adjustment (50%-150%)
+- Mode toggle (Wait/Flow)
+- Progress tracking
+- Live statistics
 
-**Recording:**
-- Format: WAV (uncompressed)
-- Sample rate: 44.1kHz
-- Channels: Mono
-- Max file size: 50MB
-- Required guidance text before recording
+**Validation:**
+- Real-time pitch detection via tuner
+- Note-by-note accuracy scoring
+- Duration validation
+- Skill-level adjusted thresholds
 
 ## Project Structure
-<pre>
+
+```
 src/
 ├── components/
-│   ├── TrumpetAnalyzer.jsx              # Main container
-│   ├── Header.jsx                       # App header
+│   ├── Common/
+│   │   └── Header.jsx
 │   ├── Analyzer/
-│   │   ├── TunerWidget.jsx              # Real-time tuner
-│   │   ├── RecordButton.jsx             # Animated button
-│   │   ├── GuidancePrompt.jsx           # Practice goal input
-│   │   ├── MetronomeSidebar.jsx         # Metronome widget
-│   │   ├── ChatSidebar.jsx              # AI chat interface
-│   │   ├── RecordingHistory.jsx         # Past recordings
-│   │   ├── AnalysisResults.jsx          # Results container
-│   │   ├── TechnicalAnalysis.jsx        # Metrics display
-│   │   ├── BreathAnalysisCard.jsx       # Breath metrics
-│   │   ├── ToneAnalysisCard.jsx         # Tone metrics
-│   │   ├── RhythmAnalysisCard.jsx       # Rhythm metrics
-│   │   ├── ExpressionAnalysisCard.jsx   # Expression metrics
-│   │   ├── FlexibilityAnalysisCard.jsx  # Flexibility metrics
-│   │   ├── FeedbackDisplay.jsx          # LLM feedback
-│   │   └── Recommendations.jsx          # Practice tips
+│   │   ├── TunerWidget.jsx
+│   │   ├── RecordButton.jsx
+│   │   ├── MetronomeSidebar.jsx
+│   │   └── ... (analysis cards)
+│   ├── PlayAlong/                           # NEW
+│   │   └── SyncedVexFlowRenderer.jsx        # Sheet music renderer
 │   ├── Auth/
-│   │   ├── Login.jsx                    # Login page
-│   │   ├── Register.jsx                 # Registration
-│   │   └── ProtectedRoute.jsx           # Route guard
-│   ├── Profile/
-│   │   └── ProfileSettings.jsx          # User settings
+│   │   ├── Login.jsx
+│   │   └── Register.jsx
 │   └── Progress/
-│       ├── ProgressDashboard.jsx        # Progress view
-│       ├── ProgressCharts.jsx           # Trend charts
-│       └── ProgressStats.jsx            # Statistics
+│       └── ProgressDashboard.jsx
+├── pages/
+│   ├── HomePage.jsx                         # NEW: Landing page
+│   ├── SongLibraryPage.jsx                  # NEW: Song browser
+│   └── PlayAlongPage.jsx                    # NEW: Practice interface
 ├── hooks/
-│   ├── useAudioRecorder.js              # Recording logic
-│   ├── useChat.js                       # Chat functionality
-│   ├── useTuner.js                      # Pitch detection
-│   └── useMetronome.js                  # Metronome logic
+│   ├── useAudioRecorder.js
+│   ├── useChat.js
+│   ├── useTuner.js
+│   └── useMetronome.js
 ├── store/
-│   ├── index.js                         # Redux store
-│   ├── hooks.js                         # Typed hooks
+│   ├── index.js
 │   └── slices/
-│       ├── recordingsSlice.js           # Recording state
-│       └── settingsSlice.js             # Settings state
-├── services/
-│   └── api.js                           # API client
-├── context/
-│   └── AuthContext.jsx                  # Auth context
+│       ├── recordingsSlice.js
+│       ├── settingsSlice.js
+│       └── playbackSlice.js                 # NEW: Playback state
 ├── utils/
-│   └── auth.js                          # Token management
-├── App.jsx                              # Main app
-└── index.jsx                            # Entry point
-</pre>
+│   ├── auth.js
+│   ├── noteValidator.js                     # NEW: Note validation
+│   └── midiHelper.js                        # NEW: MIDI utilities
+├── services/
+│   └── api.js                               # API client
+└── App.jsx
+```
 
 ## State Management (Redux)
 
 ### Recordings Slice
-
-State:
-- recordings: Array of recording objects
-- currentRecording: Selected recording
-- isPlaying: Audio playback state
-- loading: Loading state
-- error: Error message
-
-Persisted to localStorage automatically.
+- Recording history
+- Current recording
+- Playback state
 
 ### Settings Slice
+- LLM model
+- Audio quality
+- Analysis preferences
 
-State:
-- llmModel: Selected LLM model
-- audioQuality: Audio quality setting
-- defaultAnalysisType: Default analysis mode
-- showDetailedMetrics: Toggle detailed view
-
-Persisted to localStorage automatically.
+### Playback Slice (NEW)
+- Current time and duration
+- Note tracking (current index, expected note)
+- Detected pitch from tuner
+- Validation results
+- Session statistics
+- Practice mode (wait/flow)
 
 ## User Flow
 
-1. **Login/Register**: Create account, select skill level
-2. **Start Tuner**: Check pitch in real-time
-3. **Set Practice Goal**: Enter guidance text (required)
-4. **Record Performance**: Capture audio with record button
-5. **Get Analysis**: Receive AI feedback and technical metrics
-6. **Review**: Check results, ask questions, replay recordings
-7. **Track Progress**: View improvement charts and statistics
+### Traditional Practice:
+1. Login → Start Tuner → Record → Get Analysis → Review
+
+### Play-Along (NEW):
+1. Login → Browse Song Library → Select Song & Difficulty
+2. Practice with real-time feedback
+3. Complete session → View score and statistics
 
 ## Configuration
 
 ### API Endpoint
-
-In .env file:
+In `.env` file:
 ```
-REACT_APP_API_URL=http://localhost:8000
+REACT_APP_BACKEND_URL=http://localhost:8000
 ```
 
 ## License
@@ -250,6 +227,6 @@ MIT License - see LICENSE file
 
 ## Contact
 
-Burak Özenc - github.com/burak-ozenc
+Burak Özenc - [GitHub](https://github.com/burak-ozenc)
 
-Project: github.com/burak-ozenc/trub-ai-ui
+Project: [trub-ai-ui](https://github.com/burak-ozenc/trub-ai-ui)
