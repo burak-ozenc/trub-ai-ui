@@ -22,6 +22,7 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
     const currentNoteIndex = useSelector(selectCurrentNoteIndex);
     const noteResults = useSelector(selectNoteResults);
     const isPlaying = useSelector(selectIsPlaying);
+    const playbackState = useSelector(state => state.playback);
 
     // Local state
     const [loading, setLoading] = useState(true);
@@ -29,6 +30,10 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
     const [midiData, setMidiData] = useState(null);
     const [zoom, setZoom] = useState(100);
     const [autoScroll, setAutoScroll] = useState(true);
+
+    // Refs for visual overlays
+    const highlightBoxRef = useRef(null);
+    const progressBarRef = useRef(null);
 
     useEffect(() => {
         loadAndRenderMidi();
@@ -55,6 +60,13 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
             highlightCurrentNote();
         }
     }, [currentNoteIndex]);
+
+    // Update visual feedback (box + progress bar)
+    useEffect(() => {
+        if (isPlaying && noteElementsRef.current.length > 0) {
+            updateVisualFeedback();
+        }
+    }, [currentNoteIndex, playbackState.currentTime, playbackState.noteStartTime, isPlaying]);
 
     // Handle auto-scroll
     useEffect(() => {
@@ -114,15 +126,28 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
                 throw new Error('No notes found in MIDI file');
             }
 
+            // FIX: Find the first note's start time and use it as offset
+            const firstNoteTime = track.notes[0].time;
+            const timeOffset = firstNoteTime > 2 ? firstNoteTime - 2 : 0; // Keep 2 second intro
+
+            console.log('⏰ MIDI timing normalization:', {
+                originalFirstNote: firstNoteTime.toFixed(2),
+                offset: timeOffset.toFixed(2),
+                newFirstNote: (firstNoteTime - timeOffset).toFixed(2)
+            });
+
             const notes = track.notes.map(note => {
                 const vfKey = midiNoteToVexFlow(note.midi, note.name);
                 const vfDuration = durationToVexFlow(note.duration);
 
+                // FIX: Apply time offset to normalize timing
+                const normalizedTime = note.time - timeOffset;
+
                 return {
                     keys: [vfKey],
                     duration: vfDuration,
-                    time: note.time,
-                    endTime: note.time + note.duration,
+                    time: normalizedTime,
+                    endTime: normalizedTime + note.duration,
                     velocity: note.velocity,
                     // Original MIDI data
                     name: note.name,
@@ -225,6 +250,12 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
     };
 
     const highlightCurrentNote = () => {
+        // Safety check
+        if (noteElementsRef.current.length === 0) {
+            console.warn('⚠️ Cannot highlight: no note elements collected');
+            return;
+        }
+
         noteElementsRef.current.forEach((el, idx) => {
             if (!el) return;
 
@@ -396,22 +427,198 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
     };
 
     const collectNoteElements = () => {
-        // Collect all note head elements
-        const noteHeads = containerRef.current.querySelectorAll('.vf-notehead path');
+        // Try multiple selectors for note heads (VexFlow versions vary)
+        let noteHeads = containerRef.current.querySelectorAll('.vf-notehead path');
+
+        if (noteHeads.length === 0) {
+            // Try alternative selector
+            noteHeads = containerRef.current.querySelectorAll('.vf-note path');
+        }
+
+        if (noteHeads.length === 0) {
+            // Try even broader selector
+            noteHeads = containerRef.current.querySelectorAll('g.vf-stavenote > g > path');
+        }
+
+        if (noteHeads.length === 0) {
+            // Last resort - all note-related paths
+            const allPaths = containerRef.current.querySelectorAll('path');
+            noteHeads = Array.from(allPaths).filter(path => {
+                const parent = path.parentElement;
+                return parent && (
+                    parent.classList.contains('vf-notehead') ||
+                    parent.classList.contains('vf-note') ||
+                    parent.parentElement?.classList.contains('vf-stavenote')
+                );
+            });
+        }
+
         noteElementsRef.current = Array.from(noteHeads);
 
         // Collect all stem elements
-        const stems = containerRef.current.querySelectorAll('.vf-stem path');
+        const stems = containerRef.current.querySelectorAll('.vf-stem path, path[class*="stem"]');
         noteStemsRef.current = Array.from(stems);
 
         console.log('✅ Collected elements:', {
             noteHeads: noteElementsRef.current.length,
-            stems: noteStemsRef.current.length
+            stems: noteStemsRef.current.length,
+            attempts: noteHeads.length > 0 ? 'success' : 'fallback used'
         });
+
+        // If still no note heads, log DOM structure for debugging
+        if (noteElementsRef.current.length === 0) {
+            console.warn('⚠️ No note heads found! Logging SVG structure:');
+            const svgElement = containerRef.current.querySelector('svg');
+            if (svgElement) {
+                const noteGroups = svgElement.querySelectorAll('g[class*="note"]');
+                console.log('Found note groups:', noteGroups.length);
+                if (noteGroups.length > 0) {
+                    console.log('First note group:', noteGroups[0]);
+                }
+            }
+        }
 
         // Apply initial coloring
         colorNotesBasedOnResults();
         highlightCurrentNote();
+    };
+
+    /**
+     * Draw highlight box around current note
+     */
+    const drawHighlightBox = (noteIndex) => {
+        // Remove existing box
+        if (highlightBoxRef.current) {
+            highlightBoxRef.current.remove();
+            highlightBoxRef.current = null;
+        }
+
+        if (noteIndex < 0 || noteIndex >= noteElementsRef.current.length) return;
+
+        const noteElement = noteElementsRef.current[noteIndex];
+        if (!noteElement) return;
+
+        try {
+            const svg = containerRef.current.querySelector('svg');
+            if (!svg) return;
+
+            // Get bounding box of note
+            const bbox = noteElement.getBBox();
+            const padding = 8;
+
+            // Create highlight rect
+            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            rect.setAttribute('x', bbox.x - padding);
+            rect.setAttribute('y', bbox.y - padding);
+            rect.setAttribute('width', bbox.width + padding * 2);
+            rect.setAttribute('height', bbox.height + padding * 2);
+            rect.setAttribute('fill', 'none');
+            rect.setAttribute('stroke', '#FF5500');
+            rect.setAttribute('stroke-width', '3');
+            rect.setAttribute('rx', '4');
+            rect.setAttribute('class', 'current-note-highlight');
+
+            // Insert before notes so it's behind
+            const noteParent = noteElement.closest('g');
+            if (noteParent && noteParent.parentElement) {
+                noteParent.parentElement.insertBefore(rect, noteParent);
+                highlightBoxRef.current = rect;
+            }
+        } catch (err) {
+            console.warn('Could not draw highlight box:', err);
+        }
+    };
+
+    /**
+     * Draw or update progress bar under current note
+     */
+    const drawProgressBar = (noteIndex, progress) => {
+        // Remove existing bar
+        if (progressBarRef.current) {
+            progressBarRef.current.remove();
+            progressBarRef.current = null;
+        }
+
+        if (noteIndex < 0 || noteIndex >= noteElementsRef.current.length) return;
+        if (progress < 0 || progress > 1) return;
+
+        const noteElement = noteElementsRef.current[noteIndex];
+        if (!noteElement) return;
+
+        try {
+            const svg = containerRef.current.querySelector('svg');
+            if (!svg) return;
+
+            // Get bounding box of note
+            const bbox = noteElement.getBBox();
+            const barWidth = 40;
+            const barHeight = 4;
+            const barY = bbox.y + bbox.height + 10;
+            const barX = bbox.x + (bbox.width / 2) - (barWidth / 2);
+
+            // Create group for progress bar
+            const group = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+            group.setAttribute('class', 'progress-bar');
+
+            // Background bar (gray)
+            const bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            bgRect.setAttribute('x', barX);
+            bgRect.setAttribute('y', barY);
+            bgRect.setAttribute('width', barWidth);
+            bgRect.setAttribute('height', barHeight);
+            bgRect.setAttribute('fill', '#e5e7eb');
+            bgRect.setAttribute('rx', '2');
+
+            // Progress bar (orange → green)
+            const progressRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+            progressRect.setAttribute('x', barX);
+            progressRect.setAttribute('y', barY);
+            progressRect.setAttribute('width', barWidth * progress);
+            progressRect.setAttribute('height', barHeight);
+            progressRect.setAttribute('fill', progress >= 0.8 ? '#10b981' : '#FF5500');
+            progressRect.setAttribute('rx', '2');
+
+            group.appendChild(bgRect);
+            group.appendChild(progressRect);
+
+            // Insert into SVG
+            svg.appendChild(group);
+            progressBarRef.current = group;
+        } catch (err) {
+            console.warn('Could not draw progress bar:', err);
+        }
+    };
+
+    /**
+     * Update visual feedback based on current note and progress
+     */
+    const updateVisualFeedback = () => {
+        if (currentNoteIndex < 0) {
+            // Remove visuals when no current note
+            if (highlightBoxRef.current) {
+                highlightBoxRef.current.remove();
+                highlightBoxRef.current = null;
+            }
+            if (progressBarRef.current) {
+                progressBarRef.current.remove();
+                progressBarRef.current = null;
+            }
+            return;
+        }
+
+        // Draw highlight box
+        drawHighlightBox(currentNoteIndex);
+
+        // Calculate progress
+        const expectedNote = playbackState.expectedNote;
+        const noteStartTime = playbackState.noteStartTime;
+        const currentTime = playbackState.currentTime;
+
+        if (expectedNote && noteStartTime !== null) {
+            const elapsed = currentTime - noteStartTime;
+            const progress = Math.min(elapsed / expectedNote.duration, 1);
+            drawProgressBar(currentNoteIndex, progress);
+        }
     };
 
     const handleZoomIn = () => setZoom(prev => Math.min(prev + 10, 150));
@@ -508,6 +715,11 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
                 {isPlaying && currentNoteIndex >= 0 && (
                     <span className="text-orange-600 font-medium">
                         ♪ Note {currentNoteIndex + 1} of {midiData?.notes.length}
+                    </span>
+                )}
+                {isPlaying && currentNoteIndex === -1 && midiData?.notes.length > 0 && (
+                    <span className="text-blue-600 font-medium animate-pulse">
+                        ⏳ Waiting for first note at {Math.floor(midiData.notes[0].time)}:{String(Math.floor((midiData.notes[0].time % 1) * 60)).padStart(2, '0')}...
                     </span>
                 )}
                 {!isPlaying && <span>Press Play to start</span>}

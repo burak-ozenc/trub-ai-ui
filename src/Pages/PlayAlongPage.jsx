@@ -276,17 +276,39 @@ const PlayAlongPage = () => {
     };
 
     const handleWaitMode = (validation, expectedNote, noteIndex) => {
+        // In wait mode, pause until correct note with correct duration is played
+
+        const currentResult = playbackState.currentNoteResult;
+        const noteStartTime = playbackState.noteStartTime;
+        const currentTime = playbackState.currentTime;
+
+        // Calculate how long note has been held
+        const heldDuration = noteStartTime !== null ? currentTime - noteStartTime : 0;
+        const requiredDuration = expectedNote.duration;
+        const durationProgress = heldDuration / requiredDuration;
+
+        // Duration tolerance: 80% - 120% (be gentle)
+        const minDuration = requiredDuration * 0.8;
+        const maxDuration = requiredDuration * 1.2;
+        const durationMet = heldDuration >= minDuration && heldDuration <= maxDuration;
+
         console.log('⏸️ Wait Mode:', {
-            result: validation.result,
-            durationMatch: validation.durationMatch,
+            pitch: validation.result,
+            heldDuration: heldDuration.toFixed(2),
+            required: requiredDuration.toFixed(2),
+            progress: (durationProgress * 100).toFixed(0) + '%',
+            durationMet,
             isPaused: audioRef.current?.paused
         });
 
-        // In wait mode, pause until correct note is played
-        if (validation.result === 'correct' && validation.durationMatch) {
-            console.log('✅ Correct note in Wait Mode! Advancing...');
+        // Check if pitch is correct
+        const pitchCorrect = validation.result === 'correct' || validation.result === 'close';
 
-            // Note played correctly - save result
+        if (pitchCorrect && durationMet) {
+            // SUCCESS: Correct pitch held for correct duration
+            console.log('✅ Success in Wait Mode! Advancing...');
+
+            // Save result
             if (!noteResults.find(r => r.index === noteIndex)) {
                 dispatch(addNoteResult({
                     index: noteIndex,
@@ -303,10 +325,39 @@ const PlayAlongPage = () => {
             // Advance to next note
             dispatch(advanceToNextNote());
 
-        } else if (currentTime >= expectedNote.startTime + 0.3) {
-            // Been waiting for 0.3 seconds - pause and wait
+        } else if (pitchCorrect && !durationMet) {
+            // Correct pitch but still holding
+            // Keep audio paused, show progress
             if (audioRef.current && !audioRef.current.paused) {
-                console.log('⏸️ Pausing, waiting for correct note...');
+                audioRef.current.pause();
+            }
+
+            // Update feedback to show progress
+            const progressPercent = Math.min(Math.round(durationProgress * 100), 100);
+            dispatch(setCurrentNoteResult({
+                ...validation,
+                result: 'correct',
+                feedback: `Hold it... ${progressPercent}%`
+            }));
+
+        } else if (!pitchCorrect && heldDuration > 0.3) {
+            // Wrong pitch for more than 0.3 seconds
+            // Pause and wait
+            if (audioRef.current && !audioRef.current.paused) {
+                console.log('⏸️ Pausing, wrong note detected');
+                audioRef.current.pause();
+            }
+
+            dispatch(setCurrentNoteResult({
+                ...validation,
+                result: 'wrong',
+                feedback: `Play ${expectedNote.pitch}`
+            }));
+
+        } else {
+            // Waiting for sound or just started
+            if (audioRef.current && !audioRef.current.paused && currentTime >= expectedNote.startTime + 0.5) {
+                // Been waiting for 0.5 seconds - pause
                 audioRef.current.pause();
             }
         }
@@ -486,9 +537,19 @@ Duration Accuracy: ${sessionStats.durationAccuracy}%
                                     🎼 Sheet Music
                                 </h3>
 
-                                {/* Live Feedback Indicator */}
-                                {playbackState.currentNoteResult && (
-                                    <div className={`px-4 py-2 rounded-lg font-medium ${
+                                {/* Simple Expected Note Display */}
+                                {isPlaying && playbackState.expectedNote && currentNoteIndex >= 0 && (
+                                    <div className="flex items-center gap-3 px-4 py-2 bg-orange-50 rounded-lg border-2 border-orange-200">
+                                        <span className="text-sm text-gray-600">Now:</span>
+                                        <span className="text-2xl font-bold text-orange-600">
+                                            {playbackState.expectedNote.pitch}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* Live Feedback Indicator - Simple & Gentle */}
+                                {playbackState.currentNoteResult && currentNoteIndex >= 0 && (
+                                    <div className={`px-4 py-2 rounded-lg font-medium transition-all ${
                                         playbackState.currentNoteResult.result === 'correct' ? 'bg-green-100 text-green-700' :
                                             playbackState.currentNoteResult.result === 'close' ? 'bg-yellow-100 text-yellow-700' :
                                                 playbackState.currentNoteResult.result === 'wrong' ? 'bg-red-100 text-red-700' :
