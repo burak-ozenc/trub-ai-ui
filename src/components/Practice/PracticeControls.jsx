@@ -1,5 +1,5 @@
 import React from 'react';
-import { Play, Square, Mic, CheckCircle } from 'lucide-react';
+import { Square, Mic, CheckCircle } from 'lucide-react';
 
 const PracticeControls = ({
                               isRecording,

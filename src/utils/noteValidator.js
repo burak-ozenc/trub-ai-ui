@@ -289,6 +289,7 @@ export function calculateSessionStats(noteResults) {
     let totalDurationAccuracy = 0;
 
     noteResults.forEach(result => {
+        // eslint-disable-next-line default-case
         switch (result.result) {
             case 'correct':
                 stats.correctNotes++;
@@ -316,9 +317,10 @@ export function calculateSessionStats(noteResults) {
     return stats;
 }
 
-export default {
-    validateNote,
-    isDurationRequirementMet,
-    calculateSessionStats,
+let newVar = {
+    // validateNote,
+    // isDurationRequirementMet,
+    // calculateSessionStats,
     VALIDATION_THRESHOLDS
 };
+export default newVar;

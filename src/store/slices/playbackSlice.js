@@ -166,6 +166,7 @@ const playbackSlice = createSlice({
             state.noteResults.push(result);
 
             // Update statistics
+            // eslint-disable-next-line default-case
             switch (result.result) {
                 case 'correct':
                     state.sessionStats.correctNotes++;

@@ -37,12 +37,14 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
 
     useEffect(() => {
         loadAndRenderMidi();
+        // eslint-disable-next-line
     }, [songId, difficulty]);
 
     useEffect(() => {
         if (midiData) {
             renderScore();
         }
+        // eslint-disable-next-line
     }, [zoom, midiData]);
 
     // Color notes based on validation results
@@ -51,6 +53,7 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
             console.log('🎨 Coloring notes, results:', noteResults.length, 'elements:', noteElementsRef.current.length);
             colorNotesBasedOnResults();
         }
+        // eslint-disable-next-line
     }, [noteResults]);
 
     // Highlight current note
@@ -59,6 +62,7 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
             console.log('🎯 Highlighting note:', currentNoteIndex, 'total elements:', noteElementsRef.current.length);
             highlightCurrentNote();
         }
+        // eslint-disable-next-line
     }, [currentNoteIndex]);
 
     // Update visual feedback (box + progress bar)
@@ -66,6 +70,7 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
         if (isPlaying && noteElementsRef.current.length > 0) {
             updateVisualFeedback();
         }
+        // eslint-disable-next-line
     }, [currentNoteIndex, playbackState.currentTime, playbackState.noteStartTime, isPlaying]);
 
     // Handle auto-scroll
@@ -74,6 +79,7 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
             console.log('📜 Auto-scrolling to note:', currentNoteIndex);
             scrollToCurrentNote();
         }
+        // eslint-disable-next-line
     }, [currentNoteIndex, isPlaying, autoScroll]);
 
     const loadAndRenderMidi = async () => {

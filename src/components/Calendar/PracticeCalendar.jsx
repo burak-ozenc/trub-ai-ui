@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchCalendarEntries } from '../../store/slices/calendarSlice';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 const PracticeCalendar = ({ onDateClick, onAddPractice }) => {
     const dispatch = useAppDispatch();

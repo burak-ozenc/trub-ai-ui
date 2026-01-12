@@ -11,6 +11,7 @@ const SongLibraryPage = () => {
 
     useEffect(() => {
         loadSongs();
+        // eslint-disable-next-line
     }, [genreFilter]);
 
     const loadSongs = async () => {

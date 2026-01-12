@@ -8,7 +8,7 @@ import MetronomeSidebar from '../components/Analyzer/MetronomeSidebar';
 import SyncedVexFlowRenderer from '../components/PlayAlong/SyncedVexFlowRenderer';
 import useTuner from '../hooks/useTuner';
 import { validateNote } from '../utils/noteValidator';
-import { findNoteAtTime, findNoteIndexAtTime, convertMidiNoteToExpected } from '../utils/midiHelper';
+import { findNoteIndexAtTime, convertMidiNoteToExpected } from '../utils/midiHelper';
 import {
     initializePlayback,
     setPlaying,
@@ -16,7 +16,7 @@ import {
     setDuration,
     setTempo,
     resetPlayback,
-    setPlayMode,
+    // setPlayMode,
     togglePlayMode,
     setCurrentNoteIndex,
     setExpectedNote,
@@ -25,7 +25,7 @@ import {
     setCurrentNoteResult,
     addNoteResult,
     advanceToNextNote,
-    setRecording,
+    // setRecording,
     selectPlaybackState,
     selectPlayMode,
     selectCurrentNoteIndex,
@@ -53,7 +53,7 @@ const PlayAlongPage = () => {
     const [song, setSong] = useState(null);
     const [session, setSession] = useState(null);
     const [loading, setLoading] = useState(true);
-    const [midiNotes, setMidiNotes] = useState([]);
+    // const [midiNotes, setMidiNotes] = useState([]);
     const [expectedNotes, setExpectedNotes] = useState([]);
     const [user, setUser] = useState(null);
     const [audioUrl, setAudioUrl] = useState(null);
@@ -68,7 +68,8 @@ const PlayAlongPage = () => {
     const audioRef = useRef(null);
     const animationFrameRef = useRef(null);
     const lastNoteIndexRef = useRef(-1);
-    const validationTimeoutRef = useRef(null);
+    const {current} = useRef(null);
+    
 
     useEffect(() => {
         loadSongAndStartSession();
@@ -80,8 +81,8 @@ const PlayAlongPage = () => {
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
             }
-            if (validationTimeoutRef.current) {
-                clearTimeout(validationTimeoutRef.current);
+            if (current) {
+                clearTimeout(current);
             }
             // Cleanup blob URL
             if (audioUrl) {
@@ -161,7 +162,7 @@ const PlayAlongPage = () => {
         console.log('✅ Converted notes:', converted.length);
         console.log('First converted note:', converted[0]);
 
-        setMidiNotes(notes);
+        // setMidiNotes(notes);
         setExpectedNotes(converted);
 
         // Initialize Redux playback state

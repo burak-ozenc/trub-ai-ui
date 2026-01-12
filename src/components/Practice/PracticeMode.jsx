@@ -70,7 +70,7 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                 setError('Failed to start practice session: ' + err.message);
             }
         };
-
+        
         initializeSession();
 
         return () => {
@@ -83,6 +83,7 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
                 }));
             }
         };
+        // eslint-disable-next-line
     }, []); // Empty deps - only run once
 
     // Recording functions

@@ -25,6 +25,7 @@ export function simplifyNoteName(noteName) {
 /**
  * Convert parsed MIDI note to expected note format for validation
  * @param {Object} midiNote - Note from @tonejs/midi
+ * @param index
  * @returns {Object} Expected note format
  */
 export function convertMidiNoteToExpected(midiNote, index) {
@@ -272,18 +273,18 @@ export function calculateNoteSequenceStats(notes) {
     };
 }
 
-export default {
-    midiToFrequency,
-    simplifyNoteName,
-    convertMidiNoteToExpected,
-    findNoteAtTime,
-    findNoteIndexAtTime,
-    getNextNote,
-    getNotesInRange,
-    getNoteSystem,
-    isInAnticipationWindow,
-    hasNoteEnded,
-    getNoteProgress,
-    groupNotesBySystem,
-    calculateNoteSequenceStats
-};
+// export default {
+//     midiToFrequency,
+//     simplifyNoteName,
+//     convertMidiNoteToExpected,
+//     findNoteAtTime,
+//     findNoteIndexAtTime,
+//     getNextNote,
+//     getNotesInRange,
+//     getNoteSystem,
+//     isInAnticipationWindow,
+//     hasNoteEnded,
+//     getNoteProgress,
+//     groupNotesBySystem,
+//     calculateNoteSequenceStats
+// };
