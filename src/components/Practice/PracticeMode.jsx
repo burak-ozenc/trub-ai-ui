@@ -24,7 +24,6 @@ const PracticeMode = ({ exercise, onBack, calendarEntryId = null }) => {
     const { currentSession, isSessionActive, sessionStartTime } = useAppSelector(
         (state) => state.practice
     );
-    // const { user } = useAppSelector((state) => state.auth);
     const { user } = useAuth();
 
     // Recording state

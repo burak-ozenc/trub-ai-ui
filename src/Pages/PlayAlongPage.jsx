@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { api } from '../services/api';
@@ -7,7 +7,6 @@ import TunerWidget from '../components/Analyzer/TunerWidget';
 import MetronomeSidebar from '../components/Analyzer/MetronomeSidebar';
 import SyncedVexFlowRenderer from '../components/PlayAlong/SyncedVexFlowRenderer';
 import useTuner from '../hooks/useTuner';
-import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { validateNote } from '../utils/noteValidator';
 import { findNoteAtTime, findNoteIndexAtTime, convertMidiNoteToExpected } from '../utils/midiHelper';
 import {
@@ -57,10 +56,13 @@ const PlayAlongPage = () => {
     const [midiNotes, setMidiNotes] = useState([]);
     const [expectedNotes, setExpectedNotes] = useState([]);
     const [user, setUser] = useState(null);
+    const [audioUrl, setAudioUrl] = useState(null);
+
+    // Wait mode specific state
+    const [userPlayStartTime, setUserPlayStartTime] = useState(null); // When user started playing current note correctly
 
     // Hooks
     const tuner = useTuner(user?.skill_level || 'intermediate');
-    const recorder = useAudioRecorder();
 
     // Refs
     const audioRef = useRef(null);
@@ -81,8 +83,23 @@ const PlayAlongPage = () => {
             if (validationTimeoutRef.current) {
                 clearTimeout(validationTimeoutRef.current);
             }
+            // Cleanup blob URL
+            if (audioUrl) {
+                URL.revokeObjectURL(audioUrl);
+            }
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [songId, difficulty]);
+
+    // Set audio source when both audioUrl and audioRef are ready
+    useEffect(() => {
+        if (audioUrl && audioRef.current) {
+            console.log('🎵 Setting audio src:', audioUrl);
+            audioRef.current.src = audioUrl;
+            audioRef.current.load();
+            console.log('✅ Audio element loaded and ready');
+        }
+    }, [audioUrl]);
 
     const loadUserProfile = async () => {
         try {
@@ -96,23 +113,35 @@ const PlayAlongPage = () => {
     const loadSongAndStartSession = async () => {
         setLoading(true);
         try {
+            console.log('🎵 Loading song:', songId, 'difficulty:', difficulty);
+
             const songData = await api.getSongDetails(songId);
+            console.log('✅ Song data loaded:', songData);
             setSong(songData);
 
             const sessionData = await api.startPlayAlongSession(parseInt(songId), difficulty);
+            console.log('✅ Session started:', sessionData);
             setSession(sessionData);
 
+            console.log('🎧 Fetching backing track...');
             const backingTrack = await api.getSongBackingTrack(songId);
-            const audioUrl = URL.createObjectURL(backingTrack);
+            console.log('✅ Backing track blob received:', backingTrack.type, backingTrack.size, 'bytes');
 
-            if (audioRef.current) {
-                audioRef.current.src = audioUrl;
-                audioRef.current.load();
+            if (backingTrack.size === 0) {
+                throw new Error('Backing track is empty');
             }
 
+            const blobUrl = URL.createObjectURL(backingTrack);
+            console.log('✅ Blob URL created:', blobUrl);
+
+            // Store URL in state - will be set on audio element after loading completes
+            setAudioUrl(blobUrl);
+            console.log('✅ Audio URL stored in state, will be applied when component renders');
+
         } catch (error) {
-            console.error('Error loading song:', error);
-            alert('Failed to load song. Please try again.');
+            console.error('❌ Error loading song:', error);
+            console.error('Error details:', error.message, error.stack);
+            alert(`Failed to load song: ${error.message}\n\nPlease check console for details.`);
             navigate('/songs');
         } finally {
             setLoading(false);
@@ -166,13 +195,29 @@ const PlayAlongPage = () => {
                 if (animationFrameRef.current) {
                     cancelAnimationFrame(animationFrameRef.current);
                 }
+
+                // Reset wait mode timer
+                setUserPlayStartTime(null);
             } else {
                 // Play
                 console.log('▶️ Starting playback, expectedNotes:', expectedNotes.length);
+                console.log('▶️ Mode:', playMode);
+
+                
                 audioRef.current.play();
                 dispatch(setPlaying(true));
                 tuner.start();
                 startTimeTracking();
+
+                // In wait mode, pause immediately after starting to wait for user input
+                if (playMode === 'wait') {
+                    setTimeout(() => {
+                        if (audioRef.current && !audioRef.current.paused) {
+                            console.log('⏸️ Wait mode: pausing at start, waiting for user input');
+                            audioRef.current.pause();
+                        }
+                    }, 100); // Small delay to let audio element initialize
+                }
             }
         }
     };
@@ -201,8 +246,8 @@ const PlayAlongPage = () => {
         }
 
         performRealtimeValidation();
-
-    }, [isPlaying, currentTime, tuner.note, tuner.octave, tuner.frequency, tuner.cents, tuner.isDetecting, expectedNotes]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isPlaying, currentTime, tuner.note, tuner.octave, tuner.frequency, tuner.cents, tuner.isDetecting, expectedNotes, playMode, noteStartTime, user, noteResults, userPlayStartTime]);
 
     const performRealtimeValidation = () => {
         // FIX: Find expected note at current time
@@ -227,10 +272,16 @@ const PlayAlongPage = () => {
                 dispatch(setCurrentNoteIndex(noteIndex));
                 dispatch(setExpectedNote(expectedNote));
                 dispatch(setNoteStartTime(currentTime));
+
+                // Reset wait mode timer when note changes
+                setUserPlayStartTime(null);
             } else {
                 // Between notes or before first note
                 dispatch(setCurrentNoteIndex(-1));
                 dispatch(setExpectedNote(null));
+
+                // Reset wait mode timer
+                setUserPlayStartTime(null);
             }
 
             lastNoteIndexRef.current = noteIndex;
@@ -278,88 +329,122 @@ const PlayAlongPage = () => {
     const handleWaitMode = (validation, expectedNote, noteIndex) => {
         // In wait mode, pause until correct note with correct duration is played
 
-        const currentResult = playbackState.currentNoteResult;
-        const noteStartTime = playbackState.noteStartTime;
         const currentTime = playbackState.currentTime;
-
-        // Calculate how long note has been held
-        const heldDuration = noteStartTime !== null ? currentTime - noteStartTime : 0;
-        const requiredDuration = expectedNote.duration;
-        const durationProgress = heldDuration / requiredDuration;
-
-        // Duration tolerance: 80% - 120% (be gentle)
-        const minDuration = requiredDuration * 0.8;
-        const maxDuration = requiredDuration * 1.2;
-        const durationMet = heldDuration >= minDuration && heldDuration <= maxDuration;
-
-        console.log('⏸️ Wait Mode:', {
-            pitch: validation.result,
-            heldDuration: heldDuration.toFixed(2),
-            required: requiredDuration.toFixed(2),
-            progress: (durationProgress * 100).toFixed(0) + '%',
-            durationMet,
-            isPaused: audioRef.current?.paused
-        });
-
-        // Check if pitch is correct
         const pitchCorrect = validation.result === 'correct' || validation.result === 'close';
 
-        if (pitchCorrect && durationMet) {
-            // SUCCESS: Correct pitch held for correct duration
-            console.log('✅ Success in Wait Mode! Advancing...');
+        // STEP 1: Track when user starts playing the correct note
+        const isDetecting = tuner.isDetecting || false;
 
-            // Save result
-            if (!noteResults.find(r => r.index === noteIndex)) {
-                dispatch(addNoteResult({
-                    index: noteIndex,
-                    ...validation
+        if (pitchCorrect && userPlayStartTime === null && isDetecting) {
+            // User just started playing the correct note - record the time
+            setUserPlayStartTime(currentTime);
+            console.log('🎵 User started playing correct note at:', currentTime);
+
+            // Pause the backing track
+            if (audioRef.current && !audioRef.current.paused) {
+                console.log('⏸️ Pausing backing track');
+                audioRef.current.pause();
+            }
+        }
+
+        // STEP 2: Reset timer if user stops playing or plays wrong note
+        if (!pitchCorrect && userPlayStartTime !== null) {
+            console.log('❌ User stopped playing correctly, resetting timer');
+            setUserPlayStartTime(null);
+        }
+
+        // STEP 3: Calculate progress
+        const requiredDuration = expectedNote.duration;
+        let heldDuration = 0;
+        let durationProgress = 0;
+
+        if (pitchCorrect && userPlayStartTime !== null) {
+            heldDuration = currentTime - userPlayStartTime;
+            durationProgress = Math.min(heldDuration / requiredDuration, 1.0);
+        }
+
+        // Duration requirement: Hold for at least 80% of the required duration
+        const minDuration = requiredDuration * 0.8;
+        const durationMet = heldDuration >= minDuration;
+
+        // STEP 4: Update feedback based on state
+        if (pitchCorrect && userPlayStartTime !== null) {
+            const progressPercent = Math.min(Math.round(durationProgress * 100), 100);
+
+            if (durationMet) {
+                // SUCCESS: Correct pitch held long enough
+                console.log('✅ Success in Wait Mode! Note completed:', noteIndex);
+
+                // Save result
+                if (!noteResults.find(r => r.index === noteIndex)) {
+                    dispatch(addNoteResult({
+                        index: noteIndex,
+                        ...validation,
+                        durationHeld: heldDuration
+                    }));
+                }
+
+                // Reset user play timer
+                setUserPlayStartTime(null);
+
+                // Resume playback
+                if (audioRef.current && audioRef.current.paused) {
+                    console.log('▶️ Resuming audio...');
+                    audioRef.current.play();
+                }
+
+                // Advance to next note
+                dispatch(advanceToNextNote());
+
+                return; // Exit early to prevent further updates this cycle
+            } else {
+                // Still holding - show progress
+                dispatch(setCurrentNoteResult({
+                    ...validation,
+                    result: 'correct',
+                    feedback: `Hold it... ${progressPercent}%`,
+                    progress: durationProgress
                 }));
             }
+        } else if (!isDetecting || !pitchCorrect) {
+            // User not playing or playing wrong note
 
-            // Resume playback if paused
-            if (audioRef.current && audioRef.current.paused) {
-                console.log('▶️ Resuming audio...');
-                audioRef.current.play();
-            }
-
-            // Advance to next note
-            dispatch(advanceToNextNote());
-
-        } else if (pitchCorrect && !durationMet) {
-            // Correct pitch but still holding
-            // Keep audio paused, show progress
+            // Make sure audio is paused in wait mode
             if (audioRef.current && !audioRef.current.paused) {
+                console.log('⏸️ Pausing - waiting for correct note');
                 audioRef.current.pause();
             }
 
-            // Update feedback to show progress
-            const progressPercent = Math.min(Math.round(durationProgress * 100), 100);
-            dispatch(setCurrentNoteResult({
-                ...validation,
-                result: 'correct',
-                feedback: `Hold it... ${progressPercent}%`
-            }));
-
-        } else if (!pitchCorrect && heldDuration > 0.3) {
-            // Wrong pitch for more than 0.3 seconds
-            // Pause and wait
-            if (audioRef.current && !audioRef.current.paused) {
-                console.log('⏸️ Pausing, wrong note detected');
-                audioRef.current.pause();
+            if (isDetecting && !pitchCorrect) {
+                // Playing wrong note
+                dispatch(setCurrentNoteResult({
+                    ...validation,
+                    result: 'wrong',
+                    feedback: `Play ${expectedNote.pitch}`,
+                    progress: 0
+                }));
+            } else {
+                // Silent - waiting for input
+                dispatch(setCurrentNoteResult({
+                    result: 'silent',
+                    feedback: `Play ${expectedNote.pitch}`,
+                    accuracy: 0,
+                    progress: 0
+                }));
             }
+        }
 
-            dispatch(setCurrentNoteResult({
-                ...validation,
-                result: 'wrong',
-                feedback: `Play ${expectedNote.pitch}`
-            }));
-
-        } else {
-            // Waiting for sound or just started
-            if (audioRef.current && !audioRef.current.paused && currentTime >= expectedNote.startTime + 0.5) {
-                // Been waiting for 0.5 seconds - pause
-                audioRef.current.pause();
-            }
+        // Debug logging (throttled)
+        if (Math.random() < 0.1) { // Log ~10% of the time to avoid spam
+            console.log('⏸️ Wait Mode:', {
+                pitch: validation.result,
+                heldDuration: heldDuration.toFixed(2),
+                required: requiredDuration.toFixed(2),
+                progress: (durationProgress * 100).toFixed(0) + '%',
+                durationMet,
+                userPlayStartTime: userPlayStartTime !== null,
+                isPaused: audioRef.current?.paused
+            });
         }
     };
 

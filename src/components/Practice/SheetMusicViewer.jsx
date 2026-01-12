@@ -1,4 +1,4 @@
-﻿import React, {useState} from 'react';
+import React, {useState} from 'react';
 import {FileText, Download, ZoomIn, ZoomOut} from 'lucide-react';
 
 const SheetMusicViewer = ({sheetMusicUrl, exerciseTitle}) => {

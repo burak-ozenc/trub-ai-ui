@@ -7,7 +7,6 @@ import { X, Plus, Edit } from 'lucide-react';
 const AddPracticeModal = ({ date, existingEntry, onClose }) => {
     const dispatch = useAppDispatch();
     const { exercises } = useAppSelector((state) => state.exercises);
-    // const { user } = useAppSelector((state) => state.auth);
 
     const [selectedExercise, setSelectedExercise] = useState(existingEntry?.exercise_id || null);
     const [time, setTime] = useState(existingEntry?.scheduled_time || '');

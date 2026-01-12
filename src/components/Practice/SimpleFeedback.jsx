@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { CheckCircle, AlertCircle, Lightbulb, ArrowRight } from 'lucide-react';
 
 const SimpleFeedback = ({ feedback }) => {

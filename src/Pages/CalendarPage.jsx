@@ -1,10 +1,8 @@
 import React, {useState, useEffect} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {useAuth} from '../context/AuthContext';
 import {useAppDispatch, useAppSelector} from '../store/hooks';
 import {fetchUpcomingPractices, setSelectedDate} from '../store/slices/calendarSlice';
-import {ArrowLeft, Calendar as CalendarIcon, Plus, TrendingUp} from 'lucide-react';
-import ExerciseCard from '../components/Practice/ExerciseCard';
+import {ArrowLeft, Plus, TrendingUp} from 'lucide-react';
 import PracticeMode from '../components/Practice/PracticeMode';
 import Header from '../components/Common/Header';
 import MetronomeSidebar from '../components/Analyzer/MetronomeSidebar';
@@ -14,7 +12,6 @@ import PracticeCalendar from "../components/Calendar/PracticeCalendar";
 
 const CalendarPage = () => {
     const navigate = useNavigate();
-    const {user} = useAuth();
     const dispatch = useAppDispatch();
     const {upcomingPractices} = useAppSelector((state) => state.calendar);
 
@@ -137,6 +134,7 @@ const CalendarPage = () => {
                                 <h3 className="font-bold text-gray-900">Upcoming Practices</h3>
                             </div>
 
+                            
                             {upcomingPractices.length === 0 ? (
                                 <p className="text-gray-500 text-sm">No upcoming practices scheduled</p>
                             ) : (

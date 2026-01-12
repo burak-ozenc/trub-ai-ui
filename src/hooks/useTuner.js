@@ -1,5 +1,14 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 
+// Try to import Meyda, but have fallback
+let Meyda;
+try {
+    Meyda = require('meyda');
+    console.log('✅ Meyda loaded successfully');
+} catch (e) {
+    console.warn('⚠️ Meyda not available, using fallback detection');
+}
+
 const useTuner = (skillLevel = 'intermediate') => {
     const [isActive, setIsActive] = useState(false);
     const [note, setNote] = useState('A');
@@ -13,13 +22,14 @@ const useTuner = (skillLevel = 'intermediate') => {
     const audioContextRef = useRef(null);
     const analyserRef = useRef(null);
     const streamRef = useRef(null);
+    const meydaAnalyzerRef = useRef(null);
     const animationFrameRef = useRef(null);
-    const bufferRef = useRef(null);
 
     const smoothedFrequencyRef = useRef(440);
     const smoothedCentsRef = useRef(0);
-    const lastUpdateTimeRef = useRef(0);
     const lastNoteRef = useRef('A'); // Track last note for smoother transitions
+    const detectionConfidenceRef = useRef(0); // Track detection confidence
+    const lastUpdateTimeRef = useRef(0);
 
     const noteStrings = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 
@@ -46,73 +56,280 @@ const useTuner = (skillLevel = 'intermediate') => {
         return 440 * Math.pow(2, (noteIndex - 69) / 12);
     }, []);
 
-    const autoCorrelate = useCallback((buffer, sampleRate) => {
-        const SIZE = buffer.length;
-        const MAX_SAMPLES = Math.floor(SIZE / 2);
-        let best_offset = -1;
-        let best_correlation = 0;
-        let rms = 0;
-
-        for (let i = 0; i < SIZE; i++) {
-            const val = buffer[i];
-            rms += val * val;
-        }
-        rms = Math.sqrt(rms / SIZE);
-
-        setAudioLevel(Math.min(rms * 20, 1));
-
-        if (rms < 0.05) {
-            setIsDetecting(false);
-            return -1;
-        }
-
-        let lastCorrelation = 1;
-        for (let offset = 1; offset < MAX_SAMPLES; offset++) {
-            let correlation = 0;
-
-            for (let i = 0; i < MAX_SAMPLES; i++) {
-                correlation += Math.abs(buffer[i] - buffer[i + offset]);
-            }
-
-            correlation = 1 - correlation / MAX_SAMPLES;
-
-            if (correlation > 0.9 && correlation > lastCorrelation) {
-                const foundGoodCorrelation = correlation > best_correlation;
-                if (foundGoodCorrelation) {
-                    best_correlation = correlation;
-                    best_offset = offset;
-                }
-            }
-
-            lastCorrelation = correlation;
-        }
-
-        if (best_correlation > 0.1) {
-            setIsDetecting(true);
-            return sampleRate / best_offset;
-        }
-
-        setIsDetecting(false);
-        return -1;
-    }, []);
-
-    const updatePitch = useCallback(() => {
-        if (!analyserRef.current || !bufferRef.current) return;
-
-        const now = performance.now();
-
-        if (now - lastUpdateTimeRef.current < 33) {
-            animationFrameRef.current = requestAnimationFrame(updatePitch);
+    /**
+     * Process audio features from Meyda
+     * Uses multiple features for robust pitch detection
+     */
+    const processMeydaFeatures = useCallback((features) => {
+        if (!features) {
+            console.log('⚠️ Meyda callback: no features');
             return;
         }
 
+        // Extract features
+        const { rms, spectralCentroid, zcr } = features;
+
+        // Debug logging (always log initially to verify callback is working)
+        if (Math.random() < 0.05) {
+            console.log('🎤 Meyda features:', {
+                rms: rms?.toFixed(4) || 'undefined',
+                centroid: spectralCentroid?.toFixed(0) || 'undefined',
+                zcr: zcr?.toFixed(3) || 'undefined'
+            });
+        }
+
+        // Update audio level
+        const normalizedRMS = Math.min(rms * 10, 1); // More sensitive scaling
+        setAudioLevel(normalizedRMS);
+
+        // IMPROVED: Multi-stage detection with noise filtering
+        // Stage 1: Volume check (very sensitive for piano)
+        if (rms < 0.005) {
+            if (Math.random() < 0.01) {
+                console.log('🔇 Too quiet, rms:', rms.toFixed(4));
+            }
+            setIsDetecting(false);
+            detectionConfidenceRef.current = 0;
+            return;
+        }
+
+        console.log('🔊 Sound detected! rms:', rms.toFixed(4));
+
+        // Stage 2: Get fundamental frequency from FFT
+        const buffer = analyserRef.current ? new Float32Array(analyserRef.current.fftSize) : null;
+        if (buffer && analyserRef.current) {
+            analyserRef.current.getFloatTimeDomainData(buffer);
+
+            // Use YIN algorithm for better piano detection
+            const detectedFrequency = yinPitchDetection(buffer, audioContextRef.current.sampleRate);
+
+            // Stage 3: Frequency validation
+            if (detectedFrequency > 30 && detectedFrequency < 4200) { // Piano range: ~27Hz to 4186Hz
+                // Stage 4: Confidence tracking - SIMPLIFIED for better detection
+                // More lenient for piano (piano has complex harmonics)
+                const isMusicalSound = spectralCentroid > 50 && spectralCentroid < 10000; // Wider range
+                const hasGoodPeriodicity = zcr < 1000; // Much more lenient (was 0.3)
+
+                // Debug spectral features
+                if (Math.random() < 0.05) {
+                    console.log('🎼 Spectral check:', {
+                        isMusical: isMusicalSound,
+                        isPeriodic: hasGoodPeriodicity,
+                        centroid: spectralCentroid.toFixed(0),
+                        zcr: zcr.toFixed(0)
+                    });
+                }
+
+                if (isMusicalSound && hasGoodPeriodicity) {
+                    // Increase confidence faster
+                    detectionConfidenceRef.current = Math.min(detectionConfidenceRef.current + 0.5, 1);
+                } else {
+                    // Decrease confidence slower
+                    detectionConfidenceRef.current = Math.max(detectionConfidenceRef.current - 0.05, 0);
+                }
+
+                // Lower confidence threshold (was 0.5, now 0.3)
+                if (detectionConfidenceRef.current > 0.3) {
+                    setIsDetecting(true);
+
+                    // Adaptive smoothing based on confidence
+                    const smoothingFactor = 0.15 + (detectionConfidenceRef.current * 0.15); // 0.15-0.30 range
+
+                    smoothedFrequencyRef.current =
+                        smoothedFrequencyRef.current * (1 - smoothingFactor) +
+                        detectedFrequency * smoothingFactor;
+
+                    const noteData = frequencyToNote(smoothedFrequencyRef.current);
+
+                    smoothedCentsRef.current =
+                        smoothedCentsRef.current * (1 - smoothingFactor) +
+                        noteData.cents * smoothingFactor;
+
+                    // Update state
+                    setNote(noteData.noteName);
+                    setOctave(noteData.octave);
+                    setFrequency(Math.round(smoothedFrequencyRef.current * 10) / 10);
+                    setCents(Math.round(smoothedCentsRef.current));
+
+                    lastNoteRef.current = noteData.noteName;
+
+                    setStability(prev => {
+                        const newHistory = [...prev, Math.round(smoothedCentsRef.current)];
+                        return newHistory.slice(-150);
+                    });
+
+                    // Debug logging (throttled)
+                    if (Math.random() < 0.02) {
+                        console.log('🎵 Tuner:', {
+                            note: `${noteData.noteName}${noteData.octave}`,
+                            freq: detectedFrequency.toFixed(1) + 'Hz',
+                            rms: rms.toFixed(3),
+                            confidence: detectionConfidenceRef.current.toFixed(2),
+                            centroid: spectralCentroid.toFixed(0),
+                            zcr: zcr.toFixed(3)
+                        });
+                    }
+                } else {
+                    setIsDetecting(false);
+                }
+            } else {
+                setIsDetecting(false);
+                detectionConfidenceRef.current = Math.max(detectionConfidenceRef.current - 0.2, 0);
+            }
+        }
+    // eslint-disable-next-line
+    }, [frequencyToNote]);
+
+    /**
+     * YIN pitch detection algorithm
+     * More robust than autocorrelation for musical instruments
+     */
+    const yinPitchDetection = useCallback((buffer, sampleRate) => {
+        const threshold = 0.2; // INCREASED from 0.1 - more lenient for piano
+        const bufferSize = buffer.length;
+        const halfBufferSize = Math.floor(bufferSize / 2);
+
+        // Step 1: Calculate difference function
+        const yinBuffer = new Float32Array(halfBufferSize);
+
+        for (let tau = 0; tau < halfBufferSize; tau++) {
+            yinBuffer[tau] = 0;
+        }
+
+        for (let tau = 1; tau < halfBufferSize; tau++) {
+            for (let i = 0; i < halfBufferSize; i++) {
+                const delta = buffer[i] - buffer[i + tau];
+                yinBuffer[tau] += delta * delta;
+            }
+        }
+
+        // Step 2: Cumulative mean normalized difference
+        yinBuffer[0] = 1;
+        let runningSum = 0;
+
+        for (let tau = 1; tau < halfBufferSize; tau++) {
+            runningSum += yinBuffer[tau];
+            yinBuffer[tau] *= tau / runningSum;
+        }
+
+        // Step 3: Absolute threshold - find minimum
+        let tau = -1;
+        let minValue = 1.0;
+        let minTau = -1;
+
+        for (let i = 2; i < halfBufferSize; i++) {
+            if (yinBuffer[i] < minValue) {
+                minValue = yinBuffer[i];
+                minTau = i;
+            }
+
+            // Accept if below threshold
+            if (yinBuffer[i] < threshold) {
+                while (i + 1 < halfBufferSize && yinBuffer[i + 1] < yinBuffer[i]) {
+                    i++;
+                }
+                tau = i;
+                break;
+            }
+        }
+
+        // If no value below threshold, use the minimum value we found (more lenient)
+        if (tau === -1 && minValue < 0.5 && minTau > 0) {
+            tau = minTau;
+            if (Math.random() < 0.1) {
+                console.log('🔍 YIN using minimum (no threshold match):', {
+                    minValue: minValue.toFixed(3),
+                    tau: minTau,
+                    freq: (sampleRate / minTau).toFixed(1) + 'Hz'
+                });
+            }
+        }
+
+        // Step 4: Parabolic interpolation
+        if (tau !== -1 && tau > 0 && tau < halfBufferSize - 1) {
+            const s0 = yinBuffer[tau - 1];
+            const s1 = yinBuffer[tau];
+            const s2 = yinBuffer[tau + 1];
+            const adjustment = (s2 - s0) / (2 * (2 * s1 - s2 - s0));
+
+            // Clamp adjustment to prevent extreme values
+            const betterTau = tau + Math.max(-1, Math.min(1, adjustment));
+            const frequency = sampleRate / betterTau;
+
+            // Debug YIN output
+            if (Math.random() < 0.05) {
+                console.log('🎯 YIN found frequency:', {
+                    freq: frequency.toFixed(1) + 'Hz',
+                    tau: betterTau.toFixed(1),
+                    yinValue: yinBuffer[tau].toFixed(3)
+                });
+            }
+
+            return frequency;
+        }
+
+        // Debug when YIN fails
+        if (Math.random() < 0.05) {
+            console.log('❌ YIN failed:', {
+                tau: tau,
+                minValue: minValue.toFixed(3),
+                threshold: threshold
+            });
+        }
+
+        return -1;
+    }, []);
+
+    /**
+     * Fallback detection loop using requestAnimationFrame
+     * Used if Meyda doesn't work
+     */
+    const fallbackDetectionLoop = useCallback(() => {
+        if (!analyserRef.current) return;
+
+        const now = performance.now();
+        if (now - lastUpdateTimeRef.current < 50) { // ~20Hz update rate
+            animationFrameRef.current = requestAnimationFrame(fallbackDetectionLoop);
+            return;
+        }
         lastUpdateTimeRef.current = now;
 
-        analyserRef.current.getFloatTimeDomainData(bufferRef.current);
-        const detectedFrequency = autoCorrelate(bufferRef.current, audioContextRef.current.sampleRate);
+        // Get audio data
+        const buffer = new Float32Array(analyserRef.current.fftSize);
+        analyserRef.current.getFloatTimeDomainData(buffer);
 
-        if (detectedFrequency > 0 && detectedFrequency < 2000) {
-            const smoothingFactor = 0.15;
+        // Calculate RMS
+        let rms = 0;
+        for (let i = 0; i < buffer.length; i++) {
+            rms += buffer[i] * buffer[i];
+        }
+        rms = Math.sqrt(rms / buffer.length);
+
+        // Update audio level
+        setAudioLevel(Math.min(rms * 10, 1));
+
+        // Debug RMS
+        if (Math.random() < 0.05) {
+            console.log('🎤 Fallback RMS:', rms.toFixed(4));
+        }
+
+        // Check volume threshold
+        if (rms < 0.005) {
+            setIsDetecting(false);
+            animationFrameRef.current = requestAnimationFrame(fallbackDetectionLoop);
+            return;
+        }
+
+        console.log('🔊 Sound detected (fallback)! rms:', rms.toFixed(4));
+
+        // Run YIN pitch detection
+        const detectedFrequency = yinPitchDetection(buffer, audioContextRef.current.sampleRate);
+
+        if (detectedFrequency > 30 && detectedFrequency < 4200) {
+            setIsDetecting(true);
+
+            // Smooth frequency
+            const smoothingFactor = 0.2;
             smoothedFrequencyRef.current =
                 smoothedFrequencyRef.current * (1 - smoothingFactor) +
                 detectedFrequency * smoothingFactor;
@@ -123,36 +340,25 @@ const useTuner = (skillLevel = 'intermediate') => {
                 smoothedCentsRef.current * (1 - smoothingFactor) +
                 noteData.cents * smoothingFactor;
 
-            const freqDiff = Math.abs(frequency - smoothedFrequencyRef.current);
-            const centsDiff = Math.abs(cents - smoothedCentsRef.current);
-            const noteChanged = note !== noteData.noteName;
+            // Update state
+            setNote(noteData.noteName);
+            setOctave(noteData.octave);
+            setFrequency(Math.round(smoothedFrequencyRef.current * 10) / 10);
+            setCents(Math.round(smoothedCentsRef.current));
 
-            // Only update if significant change OR note actually changed
-            // More lenient for note changes to make transitions softer
-            if (freqDiff > 0.5 || centsDiff > 0.5 || (noteChanged && lastNoteRef.current !== noteData.noteName)) {
-                setNote(noteData.noteName);
-                setOctave(noteData.octave);
-                setFrequency(Math.round(smoothedFrequencyRef.current * 10) / 10);
-                setCents(Math.round(smoothedCentsRef.current));
+            lastNoteRef.current = noteData.noteName;
 
-                lastNoteRef.current = noteData.noteName;
-
-                setStability(prev => {
-                    const newHistory = [...prev, Math.round(smoothedCentsRef.current)];
-                    return newHistory.slice(-150);
-                });
-            }
+            // Debug - always log when detected
+            console.log('🎵 Detected:', noteData.noteName + noteData.octave, detectedFrequency.toFixed(1) + 'Hz');
         } else {
-            // When sound stops, gently transition back to A4
-            // Use slower smoothing to avoid jarring return
-            if (isDetecting) {
-                smoothedFrequencyRef.current = smoothedFrequencyRef.current * 0.95 + 440 * 0.05;
-                smoothedCentsRef.current = smoothedCentsRef.current * 0.9;
+            setIsDetecting(false);
+            if (detectedFrequency > 0 && Math.random() < 0.05) {
+                console.log('❌ Frequency out of range:', detectedFrequency.toFixed(1) + 'Hz');
             }
         }
 
-        animationFrameRef.current = requestAnimationFrame(updatePitch);
-    }, [autoCorrelate, frequencyToNote, frequency, cents, note, isDetecting]);
+        animationFrameRef.current = requestAnimationFrame(fallbackDetectionLoop);
+    }, [frequencyToNote, yinPitchDetection]);
 
     const start = useCallback(async () => {
         try {
@@ -162,47 +368,89 @@ const useTuner = (skillLevel = 'intermediate') => {
 
             const stream = await navigator.mediaDevices.getUserMedia({
                 audio: {
-                    echoCancellation: false,
-                    noiseSuppression: false,
-                    autoGainControl: false
+                    echoCancellation: false,  // Keep off for accurate pitch
+                    noiseSuppression: false,  // Keep off for accurate pitch
+                    autoGainControl: false,   // Keep off for consistent levels
+                    sampleRate: 44100        // Standard sample rate
                 }
             });
             streamRef.current = stream;
 
-            const analyser = audioContextRef.current.createAnalyser();
-            analyser.fftSize = 4096;
-            analyser.smoothingTimeConstant = 0.8;
-            const bufferLength = analyser.fftSize;
-            const buffer = new Float32Array(bufferLength);
-
-            analyserRef.current = analyser;
-            bufferRef.current = buffer;
-
             const source = audioContextRef.current.createMediaStreamSource(stream);
+
+            // Create analyser for YIN algorithm
+            const analyser = audioContextRef.current.createAnalyser();
+            analyser.fftSize = 8192; // Higher for better low-frequency resolution (piano)
+            analyser.smoothingTimeConstant = 0;
+            analyserRef.current = analyser;
+
             source.connect(analyser);
 
+            // Initialize Meyda for feature extraction
+            console.log('🔧 Initializing Meyda...');
+            console.log('Meyda available?', typeof Meyda !== 'undefined');
+
+            if (typeof Meyda !== 'undefined') {
+                try {
+                    meydaAnalyzerRef.current = Meyda.createMeydaAnalyzer({
+                        audioContext: audioContextRef.current,
+                        source: source,
+                        bufferSize: 8192, // Match analyser
+                        featureExtractors: ['rms', 'spectralCentroid', 'zcr'],
+                        callback: processMeydaFeatures
+                    });
+
+                    console.log('✅ Meyda analyzer created');
+                    meydaAnalyzerRef.current.start();
+                    console.log('✅ Meyda analyzer started');
+                } catch (error) {
+                    console.error('❌ Meyda initialization error:', error);
+                }
+            } else {
+                console.warn('❌ Meyda library not found! Using fallback detection');
+                // Start fallback loop
+                lastUpdateTimeRef.current = performance.now();
+                animationFrameRef.current = requestAnimationFrame(fallbackDetectionLoop);
+            }
+
+            // Reset state
             smoothedFrequencyRef.current = 440;
             smoothedCentsRef.current = 0;
-            lastUpdateTimeRef.current = performance.now();
             lastNoteRef.current = 'A';
+            detectionConfidenceRef.current = 0;
 
             setIsActive(true);
-            updatePitch();
+
+            console.log('✅ Tuner started (optimized for piano)');
+            console.log('📊 Audio context state:', audioContextRef.current.state);
+            console.log('📊 Sample rate:', audioContextRef.current.sampleRate);
+            console.log('📊 Using:', Meyda ? 'Meyda + YIN' : 'Fallback YIN');
         } catch (error) {
-            console.error('Error starting tuner:', error);
-            alert('Could not access microphone. Please allow microphone access.');
+            console.error('❌ Error starting tuner:', error);
+            alert('Could not access microphone. Please allow microphone access and refresh the page.');
         }
-    }, [updatePitch]);
+    }, [processMeydaFeatures, fallbackDetectionLoop]);
 
     const stop = useCallback(() => {
+        // Stop Meyda analyzer
+        if (meydaAnalyzerRef.current) {
+            meydaAnalyzerRef.current.stop();
+            meydaAnalyzerRef.current = null;
+        }
+
+        // Stop fallback loop
         if (animationFrameRef.current) {
             cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
         }
 
+        // Stop audio stream
         if (streamRef.current) {
             streamRef.current.getTracks().forEach(track => track.stop());
+            streamRef.current = null;
         }
 
+        // Reset state
         setIsActive(false);
         setNote('A');
         setOctave(4);
@@ -215,6 +463,9 @@ const useTuner = (skillLevel = 'intermediate') => {
         smoothedFrequencyRef.current = 440;
         smoothedCentsRef.current = 0;
         lastNoteRef.current = 'A';
+        detectionConfidenceRef.current = 0;
+
+        console.log('⏸️ Tuner stopped');
     }, []);
 
     const toggle = useCallback(() => {
@@ -227,6 +478,10 @@ const useTuner = (skillLevel = 'intermediate') => {
 
     useEffect(() => {
         return () => {
+            // Cleanup on unmount
+            if (meydaAnalyzerRef.current) {
+                meydaAnalyzerRef.current.stop();
+            }
             if (animationFrameRef.current) {
                 cancelAnimationFrame(animationFrameRef.current);
             }

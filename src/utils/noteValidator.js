@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Note Validator Utility
  *
  * Validates detected pitch against expected notes from MIDI

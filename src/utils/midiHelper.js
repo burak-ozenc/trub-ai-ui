@@ -1,4 +1,4 @@
-﻿/**
+/**
  * MIDI Helper Utility - DEBUG VERSION
  *
  * Helper functions for working with parsed MIDI data

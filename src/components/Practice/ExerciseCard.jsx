@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { Clock, Target, BookOpen } from 'lucide-react';
 
 const ExerciseCard = ({ exercise, onSelect, isSelected }) => {

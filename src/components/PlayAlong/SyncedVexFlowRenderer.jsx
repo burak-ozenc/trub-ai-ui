@@ -1,4 +1,4 @@
-﻿import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Renderer, Stave, StaveNote, Voice, Formatter, Accidental } from 'vexflow';
 import { Midi } from '@tonejs/midi';
@@ -609,14 +609,27 @@ const SyncedVexFlowRenderer = ({ songId, difficulty, onMidiLoaded }) => {
         // Draw highlight box
         drawHighlightBox(currentNoteIndex);
 
-        // Calculate progress
-        const expectedNote = playbackState.expectedNote;
-        const noteStartTime = playbackState.noteStartTime;
-        const currentTime = playbackState.currentTime;
+        // Calculate progress - use the progress from currentNoteResult if available (for wait mode)
+        const currentNoteResult = playbackState.currentNoteResult;
+        let progress = 0;
 
-        if (expectedNote && noteStartTime !== null) {
-            const elapsed = currentTime - noteStartTime;
-            const progress = Math.min(elapsed / expectedNote.duration, 1);
+        if (currentNoteResult && currentNoteResult.progress !== undefined) {
+            // Use progress from validation result (wait mode)
+            progress = currentNoteResult.progress;
+        } else {
+            // Fallback to time-based progress (flow mode)
+            const expectedNote = playbackState.expectedNote;
+            const noteStartTime = playbackState.noteStartTime;
+            const currentTime = playbackState.currentTime;
+
+            if (expectedNote && noteStartTime !== null) {
+                const elapsed = currentTime - noteStartTime;
+                progress = Math.min(elapsed / expectedNote.duration, 1);
+            }
+        }
+
+        // Draw progress bar
+        if (progress > 0) {
             drawProgressBar(currentNoteIndex, progress);
         }
     };
