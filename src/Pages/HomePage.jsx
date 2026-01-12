@@ -1,12 +1,9 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
 import Header from '../components/Common/Header';
 
 const HomePage = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
-
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 via-peach-50 to-teal-50">
             <Header />
